@@ -40,6 +40,7 @@ Run from the repo root. `make help` lists every target.
 | `make sanity` | everything CI runs: check, test and the production web build |
 | `make api-types` | regenerate `frontend/src/api/schema.d.ts` after any serializer change |
 | `make hooks-install` | gitleaks on commit, `make check` on push |
+| `make deploy` / `make prod-check` | ship `origin/main` to production / compare the live SHA; see `.claude/skills/deploy/` |
 
 CI runs the same gates and also fails when `schema.d.ts` is out of date with the backend schema.
 
