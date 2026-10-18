@@ -142,3 +142,21 @@ def test_levels_line_up_with_the_summary_tuple():
 
     assert (summary.miles_at(Level.NO_TRAVEL), summary.miles_at(Level.SEVERE)) == (1, 2)
     assert summary.miles_at(Level.HIGH) == 3
+
+
+# recommendation D3: No Travel rounds up, so a sliver of it never ties with a clean route.
+def test_any_no_travel_mileage_loses_to_a_clean_route():
+    sliver = route("sliver", no_travel=0.04)
+    clean = route("clean", severe=50)
+
+    result = recommend([sliver, clean])
+
+    assert result.recommended.route_id == "clean"
+    assert result.decided_by is RankingKey.NO_TRAVEL_MILES
+    assert result.reason == "Fewest No Travel miles: 0.0 vs 0.1 on the next best route."
+
+
+def test_a_sliver_of_no_travel_on_every_route_sets_the_flag():
+    assert recommend(
+        [route("a", no_travel=0.04), route("b", no_travel=0.02)]
+    ).all_routes_cross_no_travel

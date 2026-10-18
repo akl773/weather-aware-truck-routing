@@ -19,7 +19,8 @@ class RankingKey(StrEnum):
 def ranking_key(summary: RouteSummary) -> tuple[float, float, float, float, float]:
     """D3 order, at the precision the route cards show (D4)."""
     return (
-        display_round(summary.miles_at(Level.NO_TRAVEL), 1),
+        # D3: rounded up, so a sliver of No Travel never ties with a clean route.
+        display_round(summary.miles_at(Level.NO_TRAVEL), 1, up=True),
         display_round(summary.miles_at(Level.SEVERE), 1),
         display_round(summary.miles_at(Level.HIGH), 1),
         display_round(summary.mean_level, 2),
