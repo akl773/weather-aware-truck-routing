@@ -25,6 +25,8 @@ from providers.errors import NoRouteError  # noqa: E402
 from providers.routing import plan_routes  # noqa: E402
 from tests.providers.replay import FIXTURES, request_signature  # noqa: E402
 from tests.providers.scenarios import (  # noqa: E402
+    CORRIDOR_PATH,
+    CORRIDOR_WEATHER_FIXTURE,
     DENVER,
     LOAD_LB,
     PLACES_SCENARIOS,
@@ -38,6 +40,7 @@ from tests.providers.scenarios import (  # noqa: E402
     WEATHER_SCENARIOS,
     WEATHER_START,
 )
+from trips.corridor import corridor_cells, corridor_frames  # noqa: E402
 from trips.plan import plan_trip  # noqa: E402
 
 
@@ -116,6 +119,17 @@ def main() -> None:
                 load_lb=LOAD_LB,
                 interval_mi=PLAN_INTERVAL_MI,
                 router=live_maps,
+                weather=open_meteo.OpenMeteo(c),
+                now=PLAN_NOW,
+            ),
+            base_url=open_meteo.BASE_URL,
+        )
+        record(
+            CORRIDOR_WEATHER_FIXTURE,
+            lambda c: corridor_frames(
+                corridor_cells([CORRIDOR_PATH]),
+                departure=PLAN_DEPARTURE,
+                load_lb=LOAD_LB,
                 weather=open_meteo.OpenMeteo(c),
                 now=PLAN_NOW,
             ),

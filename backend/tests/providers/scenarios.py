@@ -50,3 +50,9 @@ PLAN_NOW = datetime(2026, 10, 18, 18, 0, tzinfo=UTC)
 PLAN_DEPARTURE = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
 PLAN_INTERVAL_MI = 25
 PLAN_WEATHER_FIXTURE = "openmeteo_plan_denver_salt_lake_city"
+
+# A corridor small enough to keep its recording small: Denver to Boulder in a straight line, at the
+# plan's departure.
+BOULDER = Point(40.0150, -105.2705)
+CORRIDOR_PATH = (DENVER, BOULDER)
+CORRIDOR_WEATHER_FIXTURE = "openmeteo_corridor_denver_boulder"

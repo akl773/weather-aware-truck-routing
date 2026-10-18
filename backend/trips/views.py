@@ -7,11 +7,15 @@ from rest_framework.views import APIView
 
 from providers import open_meteo, stadia
 from providers.geo import Point
+from trips.corridor import CorridorTooLarge, corridor_cells, corridor_frames
 from trips.plan import plan_trip
 from trips.serializers import (
+    CorridorRequestSerializer,
+    CorridorResponseSerializer,
     PlaceSerializer,
     PlanRequestSerializer,
     PlanResponseSerializer,
+    corridor_response,
     plan_response,
 )
 
@@ -77,3 +81,30 @@ class PlanView(APIView):
             now=now,
         )
         return Response(plan_response(plan))
+
+
+class CorridorView(APIView):
+    """The corridor's weather for 48 hours after departure, in one response (corridor-heatmap)."""
+
+    @extend_schema(
+        operation_id="corridor",
+        request=CorridorRequestSerializer,
+        responses={200: CorridorResponseSerializer, 400: ErrorSerializer, 502: ErrorSerializer},
+    )
+    def post(self, request: Request) -> Response:
+        now = timezone.now()
+        trip = CorridorRequestSerializer(data=request.data, context={"now": now})
+        trip.is_valid(raise_exception=True)
+        data = trip.validated_data
+        try:
+            corridor = corridor_cells(data["paths"])
+        except CorridorTooLarge as exc:
+            raise serializers.ValidationError({"paths": [str(exc)]}) from exc
+        frames = corridor_frames(
+            corridor,
+            departure=data["departure"],
+            load_lb=data["load_lb"],
+            weather=open_meteo.default(),
+            now=now,
+        )
+        return Response(corridor_response(corridor, frames, data["departure"]))

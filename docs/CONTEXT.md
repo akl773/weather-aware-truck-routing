@@ -54,10 +54,11 @@ terms. If a new concept needs a name, add it here in the same PR.
 
 ## Corridor
 
-- **Corridor**: the area within 40 km of any route of the trip.
-- **Cell**: one square of the grid covering the corridor, about 15 km across.
-- **Frame**: weather for every cell at one forecast hour. The heatmap holds 48 frames, hour 0 being
-  the departure time.
+- **Corridor**: the area within 25 miles (40 km) of any route of the trip.
+- **Cell**: one square of the grid covering the corridor: 0.15° (about 15 km) on short trips,
+  coarser on long ones so a corridor stays within 250 cells.
+- **Frame**: weather and level for every cell at one hour after departure. The heatmap holds 49
+  frames, hours 0 to 48.
 - **Truck marker**: where the truck would be on each route at the slider's hour.
 
 ## Terms we avoid

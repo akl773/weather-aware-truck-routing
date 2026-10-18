@@ -25,7 +25,7 @@ Backend rules on top of the root `AGENTS.md`.
 | `config/` | settings, URLs, health endpoint |
 | `risk/` | classification, load rules, ranking (pure) |
 | `providers/` | routing, places and weather adapters; geometry; provider cache |
-| `trips/` | API views, serializers and the provider-error mapping |
+| `trips/` | The plan and corridor services, API views, serializers and the provider-error mapping |
 | `tests/` | pytest; mirrors the package layout |
 
 ## Commands
