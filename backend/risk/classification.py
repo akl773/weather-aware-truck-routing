@@ -1,7 +1,9 @@
 """The spec's risk table and load rules. See docs/decisions/risk-classification.md."""
 
+import math
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from enum import StrEnum
 
 from risk.levels import Level
 
@@ -63,3 +65,60 @@ def wind_band_for_load(mph: float, load_lb: float) -> Level:
         if band is rule.band and load_lb > rule.over_lb:
             return rule.raises_to
     return band
+
+
+class Condition(StrEnum):
+    WIND = "wind"
+    RAIN = "rain"
+    SNOW = "snow"
+
+
+def _require_reading(name: str, value: float) -> None:
+    # D6: corrupt data must fail loudly; read as zero it would look like a calm, Low checkpoint.
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"{name} must be a finite, non-negative number, got {value!r}")
+
+
+@dataclass(frozen=True)
+class Conditions:
+    """Weather at one checkpoint at the truck's ETA."""
+
+    wind_mph: float
+    gust_mph: float
+    rain_in_hr: float
+    snow_in_hr: float
+
+    def __post_init__(self) -> None:
+        for field in fields(self):
+            _require_reading(field.name, getattr(self, field.name))
+
+
+@dataclass(frozen=True)
+class CheckpointRisk:
+    wind: Level  # after load rules
+    rain: Level
+    snow: Level
+    level: Level
+    drivers: tuple[Condition, ...]
+    gusty: bool
+
+
+def classify(conditions: Conditions, load_lb: float) -> CheckpointRisk:
+    _require_reading("load_lb", load_lb)
+    bands = {
+        Condition.WIND: wind_band_for_load(conditions.wind_mph, load_lb),
+        Condition.RAIN: rain_band(conditions.rain_in_hr),
+        Condition.SNOW: snow_band(conditions.snow_in_hr),
+    }
+    # D5: the worst condition sets the level; every condition at that level is a driver.
+    level = max(bands.values())
+    drivers = tuple(c for c, band in bands.items() if band is level) if level > Level.LOW else ()
+    return CheckpointRisk(
+        wind=bands[Condition.WIND],
+        rain=bands[Condition.RAIN],
+        snow=bands[Condition.SNOW],
+        level=level,
+        drivers=drivers,
+        # D3: gusts flag a checkpoint but never change its level.
+        gusty=wind_band_for_load(conditions.gust_mph, load_lb) > bands[Condition.WIND],
+    )
