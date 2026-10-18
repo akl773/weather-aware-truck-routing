@@ -131,23 +131,25 @@ The slider's hour lives in the map's own component, so scrubbing re-renders the 
 timeline and never the panel; the route layers are rebuilt only when the selection or highlight
 changes.
 Measured on 2026-10-19 on the production build (`vite build`, `vite preview`) in Chrome on an
-Apple M2 Pro laptop, 1440 × 900 CSS pixels at 2× on a 120 Hz display, with the live API. A slider
-step is a keyboard arrow press on the slider, 150 in a row; "React" is the synchronous update the
-press triggers, and "frame" is all `requestAnimationFrame` work in the next frame, which is where
-MapLibre and deck.gl draw. Play is 6 seconds of Play from hour 0.
+Apple M2 Pro laptop, 1440 × 900 CSS pixels at 2× on a 120 Hz display, with the live API, after the
+basemap's tiles had loaded. A slider step is a keyboard arrow press on the slider, 150 in a row;
+"React" is the synchronous update the press triggers, and "frame" is all `requestAnimationFrame`
+work in the next frame, which is where MapLibre and deck.gl draw. Play is 6 seconds of Play from
+hour 0.
 
 | Trip | Cells | React per step (p50 / p95) | Frame per step (p50 / p95) | Play frame interval (p50 / p95) |
 |---|---|---|---|---|
-| Denver to Salt Lake City | 193 | 0.4 / 0.6 ms | 4.7 / 8.8 ms | 16.7 / 26 ms |
-| New York to Los Angeles | 211 | 0.3 / 0.7 ms | 3.6 / 8.6 ms | 16.7 / 26 ms |
+| Denver to Salt Lake City | 193 | 0.3 / 0.8 ms | 4.7 / 10.3 ms | 16.6 / 25 ms |
+| New York to Los Angeles | 211 | 0.3 / 0.6 ms | 3.8 / 7.9 ms | 8.5 / 34 ms |
 
-A slider step costs under 10 ms at p95 against the 16 ms budget (`AGENTS.md`), and no step makes a
-network request. A repaint of the same map with nothing changing costs 6.7 ms of frame work (p50) at
-this resolution, so most of each step is MapLibre redrawing the basemap with the overlay, which
-interleaved mode requires (stack D9). Play holds 60 frames a second; it does not reach the
-display's 120 because each frame's map redraw plus the timeline's own repaint exceeds 8.3 ms. Giving
-the timeline its own compositor layer cut the frames over 20 ms during Play from 46 to 31 in 6
-seconds.
+A slider step costs about 11 ms at p95 in all, within the 16 ms budget (`AGENTS.md`), and no step
+makes a network request. A repaint of the same map with nothing changing costs 6.7 ms of frame
+work (p50) at this resolution, so most of each step is MapLibre redrawing the basemap with the
+overlay, which interleaved mode requires (stack D9). While the basemap is still loading tiles after
+a fit, single frames take up to 250 ms whether or not the slider moves. Play runs at 60 to 120
+frames a second; it does not hold 120 because a frame's map redraw plus the timeline's own repaint
+often exceeds 8.3 ms. Giving the timeline its own compositor layer cut the frames over 20 ms
+during Play from 46 to 31 in 6 seconds.
 Rejected: one deck.gl layer per frame toggled by visibility, because 49 layers of the same geometry
 cost 49 times the GPU memory and cannot show the time between frames.
 Enforced by: `frontend/src/corridor/colors.ts` (`frameColors`, `blendFrames`),
