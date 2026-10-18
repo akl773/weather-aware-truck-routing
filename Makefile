@@ -64,7 +64,7 @@ deploy: ## Build, ship and roll the production stack (HEAD must be on origin/mai
 prod-check: ## Compare the live site's commit with origin/main
 	@git fetch -q origin main
 	@live=$$(curl -fsS https://spotter.akhilsingh.in/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p'); \
-	want=$$(git rev-parse --short origin/main); \
+	want=$$(git rev-parse --short=12 origin/main); \
 	echo "live: $$live  origin/main: $$want"; [ "$$live" = "$$want" ]
 
 # --- Setup -------------------------------------------------------------------

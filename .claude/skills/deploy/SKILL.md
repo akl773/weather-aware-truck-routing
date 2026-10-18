@@ -28,10 +28,10 @@ failure it prints `docker compose ps` and the last 50 log lines of api and web.
 
 ## Roll back
 
-The previous image pair stays on the VM. Point the stack at it:
+The VM keeps the images of the last two deploys; `deploys.log` lists deployed tags, newest last.
 
 ```sh
-ssh oci 'cd ~/spotter && docker image ls spotter-api'          # find the previous tag
+ssh oci 'tail -n 2 ~/spotter/deploys.log'                      # the previous tag is the first line
 ssh oci 'cd ~/spotter && echo IMAGE_TAG=<tag> > .env && docker compose up -d'
 ```
 
