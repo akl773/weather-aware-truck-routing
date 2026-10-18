@@ -40,3 +40,26 @@ def rain_band(in_hr: float) -> Level:
 
 def snow_band(in_hr: float) -> Level:
     return SNOW_IN_HR.band(in_hr)
+
+
+@dataclass(frozen=True)
+class LoadRule:
+    """Wind in `band` with a load strictly heavier than `over_lb` is raised to `raises_to` (D4)."""
+
+    band: Level
+    over_lb: float
+    raises_to: Level
+
+
+LOAD_RULES = (
+    LoadRule(band=Level.SEVERE, over_lb=30_000, raises_to=Level.NO_TRAVEL),  # 45 to 54 mph
+    LoadRule(band=Level.HIGH, over_lb=40_000, raises_to=Level.SEVERE),  # 35 to 44 mph
+)
+
+
+def wind_band_for_load(mph: float, load_lb: float) -> Level:
+    band = wind_band(mph)
+    for rule in LOAD_RULES:
+        if band is rule.band and load_lb > rule.over_lb:
+            return rule.raises_to
+    return band

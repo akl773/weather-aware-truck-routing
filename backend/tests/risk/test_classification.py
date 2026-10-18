@@ -1,6 +1,6 @@
 import pytest
 
-from risk.classification import rain_band, snow_band, wind_band
+from risk.classification import rain_band, snow_band, wind_band, wind_band_for_load
 from risk.levels import Level
 
 L, M, H, S, N = Level.LOW, Level.MODERATE, Level.HIGH, Level.SEVERE, Level.NO_TRAVEL
@@ -65,3 +65,26 @@ def test_bands_never_decrease_as_the_value_rises(band):
     values = [step / 100 for step in range(0, 8000)]
     levels = [band(value) for value in values]
     assert levels == sorted(levels)
+
+
+# risk-classification D4: load rules raise the wind band only for loads strictly above the limit.
+# fmt: off
+LOAD_CASES = [
+    # mph,   lb,     level  why
+    (55,    0,      N),  # ≥ 55 mph is No Travel for any load
+    (45,    30_001, N),  # 45 to 54 mph and > 30,000 lb
+    (54.99, 30_001, N),
+    (45,    30_000, S),  # exactly 30,000 lb is not "more than"
+    (35,    40_001, S),  # 35 to 44 mph and > 40,000 lb
+    (44.99, 40_001, S),
+    (35,    40_000, H),  # exactly 40,000 lb is not "more than"
+    (40,    35_000, H),  # between the two weight limits
+    (34.99, 80_000, M),  # below 35 mph no load rule applies
+    (20,    80_000, L),
+]
+# fmt: on
+
+
+@pytest.mark.parametrize(("mph", "load_lb", "expected"), LOAD_CASES)
+def test_load_rules(mph, load_lb, expected):
+    assert wind_band_for_load(mph, load_lb) is expected
