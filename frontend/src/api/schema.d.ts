@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/corridor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The corridor's weather for 48 hours after departure, in one response (corridor-heatmap). */
+        post: operations["corridor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -77,6 +94,28 @@ export interface components {
             drivers: components["schemas"]["DriversEnum"][];
             gusty: boolean;
         };
+        /** @description Departure and load, shared by the plan and its corridor (D1, corridor-heatmap D3). */
+        CorridorRequest: {
+            /** Format: date-time */
+            departure: string;
+            load_lb: number;
+            paths: number[][][];
+        };
+        CorridorResponse: {
+            /**
+             * Format: double
+             * @description Cell width and height in degrees.
+             */
+            cell_deg: number;
+            /** @description [longitude, latitude] of each cell's centre. */
+            cells: number[][];
+            /**
+             * Format: date-time
+             * @description The departure: hour 0.
+             */
+            start: string;
+            frames: components["schemas"]["Frame"][];
+        };
         /**
          * @description * `no_travel_miles` - no_travel_miles
          *     * `unknown_miles` - unknown_miles
@@ -101,6 +140,16 @@ export interface components {
             fields?: {
                 [key: string]: unknown;
             };
+        };
+        Frame: {
+            /** @description Hours after departure, 0 to 48. */
+            hour: number;
+            /** @description Each cell's level, in cell order; null unknown. */
+            level: (number | null)[];
+            wind_mph: (number | null)[];
+            gust_mph: (number | null)[];
+            rain_in_hr: (number | null)[];
+            snow_in_hr: (number | null)[];
         };
         Health: {
             status: string;
@@ -144,12 +193,13 @@ export interface components {
             /** Format: double */
             lon: number;
         };
+        /** @description Departure and load, shared by the plan and its corridor (D1, corridor-heatmap D3). */
         PlanRequest: {
-            origin: components["schemas"]["Place"];
-            destination: components["schemas"]["Place"];
             /** Format: date-time */
             departure: string;
             load_lb: number;
+            origin: components["schemas"]["Place"];
+            destination: components["schemas"]["Place"];
             /** @default 25 */
             interval_mi: components["schemas"]["IntervalMiEnum"];
         };
@@ -219,6 +269,47 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    corridor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorridorRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CorridorRequest"];
+                "multipart/form-data": components["schemas"]["CorridorRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorridorResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     health: {
         parameters: {
             query?: never;
