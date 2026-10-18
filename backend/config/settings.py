@@ -53,7 +53,13 @@ DATABASES: dict = {}
 REDIS_URL = os.environ.get("REDIS_URL", "")
 CACHES = {
     "default": (
-        {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}
+        {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            # A Redis that hangs must fail fast, so the fail-open cache costs latency, not a
+            # request (routing D7).
+            "OPTIONS": {"socket_connect_timeout": 0.5, "socket_timeout": 0.5},
+        }
         if REDIS_URL
         else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
     )
