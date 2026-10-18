@@ -42,9 +42,10 @@ Enforced by: `test_rain_at_exactly_1_00_is_severe`, `test_snow_at_exactly_3_0_is
 
 ### D3. Sustained wind sets the band; gusts only raise a flag
 The table classifies wind speed, which by the usual forecast convention means sustained wind. Gusts
-are still a real hazard for a high-sided trailer, so when the gust speed would put the checkpoint in a
-higher band (load rules included), the checkpoint carries a gust flag that the UI shows. The flag
-never changes the level or the ranking.
+are still a real hazard for a high-sided trailer, so when the gust speed would put the wind band
+higher (load rules included), the checkpoint carries a gust flag that the UI shows. The flag compares
+wind bands only, so it can be set on a checkpoint whose level comes from snow or rain. It never
+changes the level or the ranking. A gust reading below the sustained wind never sets the flag.
 Rejected: gusts drive the band, because typical gust factors push ordinary days into High and Severe
 and the ranking stops telling routes apart.
 Rejected: `max(sustained, 0.8 × gust)`, because the 0.8 factor would be invented.
@@ -62,19 +63,34 @@ Enforced by: `risk.classification.wind_band_for_load`; `test_load_rules`.
 
 ### D5. A checkpoint's level is its worst condition, and every condition at that level is named
 Level = max(wind band after load rules, rain band, snow band). The conditions that reach that level
-are returned as the drivers ("snow 1.4 in/hr"), so the UI can say why a checkpoint is Severe. When two
-conditions tie, both are named instead of picking one arbitrarily. A Low checkpoint has no drivers.
+are returned as the drivers, and the UI pairs each with its reading ("snow 2.4 in/hr") to say why a
+checkpoint is Severe. When two conditions tie, both are named instead of picking one arbitrarily. A
+Low checkpoint has no drivers.
 Rejected: an additive score across conditions (High wind + Moderate rain → Severe), because the spec
 gives no rule for combining conditions and adding one would invent risk.
 Enforced by: `risk.classification.classify`; `test_level_is_the_worst_condition`,
 `test_tied_conditions_are_all_drivers`.
 
 ### D6. Impossible readings are rejected, never classified
-A negative or non-finite (NaN, infinite) wind, gust, rain, snow or load value raises `ValueError`.
-Treating it as zero would quietly report Low on corrupt provider data, which is the one failure this
-app must never have.
+A wind, gust, rain, snow or load value that is negative, non-finite (NaN, infinite), too large for a
+float, a boolean or not a number at all raises `ValueError`. Treating it as zero would quietly report
+Low on corrupt provider data, which is the one failure this app must never have.
 Rejected: clamping negatives to zero, because it hides adapter bugs.
-Enforced by: `risk.classification.Conditions`; `test_rejects_impossible_readings`.
+Enforced by: `risk.classification.Conditions`, `classify`; `test_rejects_impossible_readings`,
+`test_rejects_impossible_loads`.
+
+### D7. Readings are rounded to 6 decimal places before comparison with an edge
+Readings reach this module after unit conversion and interpolation, and binary floating point lands
+next to an edge instead of on it: 88.51392 km/h converts to 54.99999999999999 mph, and halfway
+between 0.01 and 0.19 in/hr is 0.09999999999999999. Compared raw, both fall one band too low, and
+the 55 mph wind would escape the any-load No Travel rule. Rounding to 6 decimals removes that noise
+and changes no real reading, since every provider value is far coarser.
+Rejected: rounding to the table's own precision (0.01 in/hr, 1 mph), because it moves real readings:
+0.096 in/hr would become Moderate.
+Rejected: `math.isclose` at each comparison, because a tolerance spread across every edge check is
+harder to reason about than one rounding step.
+Enforced by: `risk.classification.BandEdges.band`, `wind_band_for_load`;
+`test_float_noise_lands_on_the_edge`.
 
 ## Open questions
 
