@@ -12,10 +12,13 @@ Every step runs on the live site, https://spotter.akhilsingh.in.
 
 ## 2. Logic (40%) (3 min)
 
-Plan Denver to Salt Lake City, 45,000 lb, checking every 25 miles.
+Plan Denver to Salt Lake City, 45,000 lb, checking every 25 miles. On a calm day every checkpoint
+can be Low; then show the levels through the Wind view, the README's table and its tests, and
+pick a trip under a storm from the forecast if one is near.
 
-- **Three routes.** Point out a Fallback chip: when the router offers fewer than three distinct
-  routes, the rest come from a via point off the direct line (`routing.md` D4). The load also goes
+- **Three routes.** When the router offers fewer than three distinct routes, the rest come from a
+  via point off the direct line and carry a Fallback chip (`routing.md` D4). If this trip has none,
+  plan Portland to Boise, where the router offered one route on 18 October 2026. The load also goes
   to the router, so a heavier truck can be sent another way (`routing.md` D2).
 - **Checkpoints at the ETA.** Expand the checkpoint list: mile, ETA in the browser's zone, the
   readings interpolated to that minute, and the level with the reason
@@ -38,8 +41,10 @@ Plan Denver to Salt Lake City, 45,000 lb, checking every 25 miles.
   checkpoint for its tooltip; hover a row in the list to find it on the map.
 - The heatmap: the corridor within 25 miles of every route, coloured by the level a checkpoint
   there would get for this load, beneath the map's labels (`corridor-heatmap.md` D1, D2, D5).
-- Press Play: 48 hours in 16 seconds, the colours blending between hourly frames, each route's
-  truck where its ETAs put it. Drag the slider back and forth.
+- Switch to Wind and press Play: 48 hours in 16 seconds, the colours blending between hourly
+  frames, each route's truck where its ETAs put it. Back on Risk the colours step by the hour,
+  since a blend of two levels' colours would show a third (`corridor-heatmap.md` D7). Drag the
+  slider back and forth.
 - Open the network panel and scrub: no requests. Switch to Wind, Rain and Snow: continuous ramps
   with their units, never level colours (`corridor-heatmap.md` D6, D7).
 - Performance: one request for all 49 frames (about 30 KB gzipped); a slider step costs about

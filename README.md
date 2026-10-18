@@ -7,7 +7,7 @@ corridor plays the next 48 hours of weather.
 
 **Live:** https://spotter.akhilsingh.in (the footer shows the deployed commit)
 
-![Denver to Salt Lake City: three routes coloured by risk at the truck's ETA, the corridor heatmap and the 48-hour timeline](docs/images/app.png)
+![Denver to Salt Lake City on a calm day: three ranked routes, every checkpoint Low, the corridor heatmap and the 48-hour timeline three hours after departure](docs/images/app.png)
 
 ## What it does
 
@@ -24,8 +24,10 @@ corridor plays the next 48 hours of weather.
 - **The map**: each route coloured by its checkpoints' levels, the selected one on top, with
   tooltips, a checkpoint list and the cards all in sync.
 - **The corridor heatmap**: every cell within 25 miles of a route, one request for all 49 hourly
-  frames, coloured by risk for this load or by raw wind, rain or snow. The slider and Play blend
-  between hours and move each route's truck, and never touch the network.
+  frames, coloured by risk for this load or by raw wind, rain or snow. The slider and Play move
+  each route's truck and never touch the network. The wind, rain and snow views blend between
+  hours; the risk view steps from hour to hour, since a blend of two levels' colours is a third
+  level's.
 
 ## How risk is decided
 
@@ -49,8 +51,8 @@ in the brief they settle, are in [risk classification](docs/decisions/risk-class
 
 ## Performance
 
-- A long plan takes about 2 s cold and about 1 s from the cache. The weather for a whole route is a
-  few batched requests on a shared 0.05° lattice, so nearby trips share cached forecasts.
+- The weather for a whole route is a few batched requests on a shared 0.05° lattice, so nearby
+  trips share cached forecasts.
 - The heatmap is one response of about 30 KB gzipped for all 49 frames.
 - A slider step costs about 11 ms at p95 on an M2 Pro laptop at 2×, including the map redraw, and
   makes no request. The method and numbers are in
@@ -80,7 +82,7 @@ needs none.
 ```bash
 cp backend/.env.example backend/.env   # add STADIA_API_KEY
 make dev                               # http://localhost:5173
-make sanity                            # every gate CI runs, including the browser test
+make sanity                            # lint, types, tests, the web build and the browser test
 ```
 
 `make help` lists every target.
@@ -112,6 +114,6 @@ reports the new commit. Details: [deployment decisions](docs/decisions/deploymen
 ## How it was built
 
 Each piece of work was an issue, a branch and a pull request. The decision record for the area
-came first and the code followed in small commits, each green on its own. Every PR ran the same
-gates as `make sanity` in CI and had an adversarial review before it merged; the findings and fixes
-are in each PR's comments. A decision, once recorded, changed only through a PR that edited it.
+came first and the code followed in small commits, each green on its own. Every PR ran the CI gates
+before it merged. From #21 on, each also had an adversarial review; the findings and fixes are in
+the PR's comments. A decision, once recorded, changed only through a PR that edited it.
