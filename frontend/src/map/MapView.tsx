@@ -19,20 +19,35 @@ interface MapViewProps {
   /** Fitted once each time it changes, leaving room for the panel. */
   bounds: Bounds | null;
   onHover?: (info: PickingInfo) => void;
+  /** The view starts moving, so anything pinned to a screen position is stale. */
+  onMoveStart?: () => void;
 }
 
 const WIDE = "(min-width: 900px)";
 
-export function MapView({ layers, bounds, onHover }: MapViewProps) {
+/** Room around the fitted routes for whatever floats over the map. */
+function fitPadding() {
+  if (window.matchMedia(WIDE).matches) return { top: 48, bottom: 160, left: 456, right: 48 };
+  // The panel covers the top 60% on narrow screens. On a short one that leaves too little room,
+  // and MapLibre refuses to fit at all, so both edges shrink to leave at least 30% of the height.
+  const height = window.innerHeight;
+  const top = height * 0.6 + 24;
+  const bottom = 140;
+  const scale = Math.min(1, (height * 0.7) / (top + bottom));
+  return { top: top * scale, bottom: bottom * scale, left: 24, right: 24 };
+}
+
+function cursor({ isDragging, isHovering }: { isDragging: boolean; isHovering: boolean }) {
+  return isDragging ? "grabbing" : isHovering ? "pointer" : "grab";
+}
+
+export function MapView({ layers, bounds, onHover, onMoveStart }: MapViewProps) {
   const map = useRef<MapRef>(null);
 
   useEffect(() => {
     if (!bounds || !map.current) return;
-    const wide = window.matchMedia(WIDE).matches;
     map.current.fitBounds(bounds, {
-      padding: wide
-        ? { top: 48, bottom: 160, left: 456, right: 48 }
-        : { top: window.innerHeight * 0.6 + 24, bottom: 140, left: 24, right: 24 },
+      padding: fitPadding(),
       duration: 900,
       maxZoom: 9,
     });
@@ -45,17 +60,17 @@ export function MapView({ layers, bounds, onHover }: MapViewProps) {
       mapStyle={BASEMAP_STYLE_URL}
       style={{ position: "absolute", inset: 0 }}
       attributionControl={{ compact: true }}
+      onMoveStart={onMoveStart}
     >
       <NavigationControl position="bottom-right" showCompass={false} />
       <DeckOverlay
         interleaved
         layers={layers}
-        onHover={(info) => {
-          // The map owns the canvas in interleaved mode, so it owns the cursor too.
-          const canvas = map.current?.getCanvas();
-          if (canvas) canvas.style.cursor = info.picked ? "pointer" : "";
-          onHover?.(info);
-        }}
+        // deck.gl sets the shared canvas's cursor every frame, so the pointer is decided here.
+        getCursor={cursor}
+        // Checkpoints are a few pixels wide when zoomed out; this makes them easy to hover.
+        pickingRadius={5}
+        onHover={onHover}
       />
     </MapLibreMap>
   );

@@ -5,7 +5,7 @@ import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PlanRequest, fetchHealth } from "./api/client";
 import type { components } from "./api/schema";
@@ -13,7 +13,7 @@ import { Header } from "./layout/Header";
 import { Panel } from "./layout/Panel";
 import { CheckpointTooltip } from "./map/CheckpointTooltip";
 import { MapView } from "./map/MapView";
-import { type CheckpointPick, planBounds, planLayers } from "./map/planLayers";
+import { type CheckpointPick, planBounds, planGeometry, planLayers } from "./map/planLayers";
 import { CheckpointList } from "./plan/CheckpointList";
 import { Recommendation, RouteCards } from "./plan/RouteCards";
 import { usePlan } from "./plan/usePlan";
@@ -39,31 +39,44 @@ export function App() {
   const [chosen, setChosen] = useState<{ plan: unknown; id: RouteId } | null>(null);
   const selectedId =
     data && chosen?.plan === data ? chosen.id : (data?.recommendation.route_id ?? "A");
-  const select = (id: RouteId) => data && setChosen({ plan: data, id });
+  // Stable, so the memoised panel does not re-render when only the map's hover changes.
+  const select = useCallback((id: RouteId) => data && setChosen({ plan: data, id }), [data]);
 
   const [hover, setHover] = useState<Hover | null>(null);
   const [listed, setListed] = useState<number | null>(null);
   const selectedRoute = data?.routes.find((route) => route.id === selectedId);
-  const highlighted =
-    listed !== null && selectedRoute?.checkpoints[listed]
-      ? { routeId: selectedId, index: listed, checkpoint: selectedRoute.checkpoints[listed] }
-      : (hover?.pick ?? null);
+  const listedCheckpoint = listed === null ? undefined : selectedRoute?.checkpoints[listed];
+  const hoverPick = hover?.pick ?? null;
+  const highlighted = useMemo(
+    () =>
+      listed !== null && listedCheckpoint
+        ? { routeId: selectedId, index: listed, checkpoint: listedCheckpoint }
+        : hoverPick,
+    [listed, listedCheckpoint, selectedId, hoverPick],
+  );
 
   const bounds = useMemo(() => (data ? planBounds(data) : null), [data]);
-  const layers = data && request
-    ? planLayers({ plan: data, request, selectedId, highlighted, onSelectRoute: select })
-    : [];
+  const geometry = useMemo(() => (data ? planGeometry(data, selectedId) : null), [data, selectedId]);
+  const layers = useMemo(
+    () =>
+      geometry && request
+        ? planLayers({ geometry, request, selectedId, highlighted, onSelectRoute: select })
+        : [],
+    [geometry, request, selectedId, highlighted, select],
+  );
 
   const onHover = (info: PickingInfo) => {
     const object = info.object as Partial<CheckpointPick> | undefined;
     setHover(
-      info.layer?.id === "checkpoints" && object?.checkpoint
+      info.layer?.id.startsWith("checkpoints") && object?.checkpoint
         ? { pick: object as CheckpointPick, x: info.x, y: info.y }
         : null,
     );
   };
 
-  const showResults = Boolean(data) && !editing;
+  // A refetch of the same trip (ui D5) shows the form again while it runs and if it fails, so an
+  // old plan never stands in for a new one.
+  const showResults = Boolean(data) && !editing && !plan.isFetching && !plan.isError;
   // The form collapses under the focused button, so focus moves to what replaced it.
   const results = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -111,7 +124,12 @@ export function App() {
         ) : null}
       </Panel>
       {/* After the panel, so keyboard users reach the form before the map. */}
-      <MapView layers={layers} bounds={bounds} onHover={onHover} />
+      <MapView
+        layers={layers}
+        bounds={bounds}
+        onHover={onHover}
+        onMoveStart={() => setHover(null)}
+      />
       {hover ? <CheckpointTooltip pick={hover.pick} x={hover.x} y={hover.y} /> : null}
       <Typography
         component="footer"
