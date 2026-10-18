@@ -5,6 +5,7 @@ import pytest
 
 from providers.open_meteo import BASE_URL as WEATHER_URL
 from providers.open_meteo import OpenMeteo, Series
+from providers.routing import plan_routes
 from providers.stadia import BASE_URL as ROUTING_URL
 from providers.stadia import StadiaMaps
 from risk.classification import Condition
@@ -86,12 +87,46 @@ def test_missing_gust_only_clears_the_gust_flag():
     assert gusty is False
 
 
+@pytest.mark.parametrize(
+    ("readings", "load_lb", "driver"),
+    [
+        (Readings(55.0, None, None, 0.0), 0, Condition.WIND),
+        (Readings(46.0, None, 0.0, None), 30_001, Condition.WIND),
+        (Readings(None, None, 1.01, 0.0), 0, Condition.RAIN),
+        (Readings(0.0, 0.0, None, 3.01), 0, Condition.SNOW),
+    ],
+    ids=["wind_55", "wind_46_heavy", "rain_1_01", "snow_3_01"],
+)
+def test_a_known_no_travel_reading_decides_a_partial_forecast(readings, load_lb, driver):
+    level, drivers, _ = classify_checkpoint(readings, load_lb)
+    assert level is Level.NO_TRAVEL
+    assert drivers == (driver,)
+
+
+@pytest.mark.parametrize(
+    ("readings", "load_lb"),
+    [
+        (Readings(54.9, None, None, 0.0), 0),
+        (Readings(46.0, None, 0.0, None), 30_000),
+        (Readings(None, None, 1.0, 0.0), 0),
+        (Readings(0.0, 0.0, None, 3.0), 0),
+    ],
+    ids=["wind_54_9", "wind_46_at_30000", "rain_1_00", "snow_3_00"],
+)
+def test_a_partial_forecast_below_no_travel_is_unknown(readings, load_lb):
+    assert classify_checkpoint(readings, load_lb) == (None, (), False)
+
+
 def test_load_rules_apply_through_the_plan():
     assert classify_checkpoint(Readings(46.0, 46.0, 0.0, 0.0), 30_000)[0] is Level.SEVERE
     assert classify_checkpoint(Readings(46.0, 46.0, 0.0, 0.0), 30_001)[0] is Level.NO_TRAVEL
 
 
 # --- A recorded plan -----------------------------------------------------------------------------
+
+
+def recorded_router() -> StadiaMaps:
+    return StadiaMaps(replay_client("stadia_route_denver_salt_lake_city", ROUTING_URL), "k")
 
 
 @pytest.fixture
@@ -102,14 +137,18 @@ def recorded_plan():
         departure=PLAN_DEPARTURE,
         load_lb=LOAD_LB,
         interval_mi=PLAN_INTERVAL_MI,
-        router=StadiaMaps(replay_client("stadia_route_denver_salt_lake_city", ROUTING_URL), "k"),
+        router=recorded_router(),
         weather=OpenMeteo(replay_client(PLAN_WEATHER_FIXTURE, WEATHER_URL)),
         now=PLAN_NOW,
     )
 
 
-def test_plan_has_three_routes_with_ids_in_provider_order(recorded_plan):
+def test_routes_are_named_a_b_c_in_the_router_order(recorded_plan):
+    routes = plan_routes(recorded_router(), DENVER, SALT_LAKE_CITY, LOAD_LB)
     assert [r.id for r in recorded_plan.routes] == ["A", "B", "C"]
+    assert [r.summary.distance_miles for r in recorded_plan.routes] == [
+        r.distance_mi for r in routes
+    ]
 
 
 def test_every_checkpoint_has_a_known_level_inside_the_forecast(recorded_plan):

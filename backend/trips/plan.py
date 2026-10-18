@@ -1,9 +1,7 @@
 """Compose routes, checkpoints, weather and the risk engine into a trip plan (plan-api.md)."""
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from itertools import pairwise
 
 from providers.geo import Point, simplify
 from providers.open_meteo import OpenMeteo, Series, fetch_window
@@ -11,7 +9,13 @@ from providers.routing import Route, Router, plan_routes
 from risk.classification import Condition, Conditions, classify
 from risk.levels import Level
 from risk.recommendation import Recommendation, recommend
-from risk.scoring import CheckpointLevel, RouteSummary, display_round, summarize_route
+from risk.scoring import (
+    CheckpointLevel,
+    RouteSummary,
+    display_round,
+    owned_stretches,
+    summarize_route,
+)
 from trips.checkpoints import place_checkpoints, value_at
 
 ROUTE_IDS = ("A", "B", "C")
@@ -78,29 +82,35 @@ def readings_at(series: Series, eta: datetime) -> Readings:
 def classify_checkpoint(
     readings: Readings, load_lb: float
 ) -> tuple[Level | None, tuple[Condition, ...], bool]:
-    """Level, driver conditions and gust flag; an unknown level without a full forecast (D3)."""
-    if readings.wind_mph is None or readings.rain_in_hr is None or readings.snow_in_hr is None:
-        return None, (), False
+    """Level, driver conditions and gust flag (D3).
+
+    Without a full forecast the level is unknown, unless a known reading is already No Travel: the
+    level is the worst condition (risk-classification D5), so nothing missing could change it.
+    """
+    wind, rain, snow = readings.wind_mph, readings.rain_in_hr, readings.snow_in_hr
+    complete = wind is not None and rain is not None and snow is not None
     # A missing gust only clears the flag: gusts never set the level (risk-classification D3).
-    gust = readings.wind_mph if readings.gust_mph is None else readings.gust_mph
+    gust = wind if readings.gust_mph is None or wind is None else readings.gust_mph
+    # Missing readings stand in as calm only to ask whether the known ones reach No Travel; that
+    # answer is used, and any other one is discarded.
     risk = classify(
-        Conditions(readings.wind_mph, gust, readings.rain_in_hr, readings.snow_in_hr), load_lb
+        Conditions(*(0.0 if v is None else v for v in (wind, gust, rain, snow))), load_lb
     )
-    return risk.level, risk.drivers, risk.gusty
+    if complete or risk.level is Level.NO_TRAVEL:
+        return risk.level, risk.drivers, risk.gusty
+    return None, (), False
 
 
 def _path(route: Route) -> tuple[tuple[float, float, float], ...]:
     """Simplified geometry with the mile of every kept point (D4)."""
     return tuple(
-        (round(route.points[i].lon, 5), round(route.points[i].lat, 5), round(route.cum_mi[i], 2))
+        (
+            round(route.points[i].lon, 5),
+            round(route.points[i].lat, 5),
+            display_round(route.cum_mi[i], 2),
+        )
         for i in simplify(route.points, PATH_TOLERANCE_DEG)
     )
-
-
-def _owned_bounds(miles: Sequence[float], route_mi: float) -> list[tuple[float, float]]:
-    """Where each checkpoint's owned stretch starts and ends (recommendation D1)."""
-    boundaries = [0.0, *((a + b) / 2 for a, b in pairwise(miles)), route_mi]
-    return list(pairwise(boundaries))
 
 
 def plan_trip(
@@ -126,7 +136,7 @@ def plan_trip(
 
     planned: list[PlannedRoute] = []
     for route_id, route, checkpoints in zip(ROUTE_IDS, routes, placed, strict=False):
-        bounds = _owned_bounds([c.mile for c in checkpoints], route.distance_mi)
+        bounds = owned_stretches([c.mile for c in checkpoints], route.distance_mi)
         rows = []
         for checkpoint, (owned_from, owned_to) in zip(checkpoints, bounds, strict=True):
             readings = readings_at(series[checkpoint.point], checkpoint.eta)

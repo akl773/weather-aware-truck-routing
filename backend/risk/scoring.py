@@ -27,11 +27,13 @@ class CheckpointLevel:
     level: Level | None  # None when the weather at the ETA is unknown (D7)
 
 
-def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[float]:
-    """Miles of road each checkpoint speaks for (D1).
+def owned_stretches(
+    checkpoint_miles: Sequence[float], route_miles: float
+) -> list[tuple[float, float]]:
+    """Where each checkpoint's stretch of road starts and ends (D1).
 
     Boundaries sit halfway between neighbouring checkpoints; the first stretch starts at the origin
-    and the last ends at the destination, so the result always sums to `route_miles`.
+    and the last ends at the destination, so the stretches tile the route.
     """
     if not checkpoint_miles:
         raise ValueError("a route needs at least one checkpoint")
@@ -46,8 +48,12 @@ def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[f
         raise ValueError("checkpoints must lie within the route")
 
     midpoints = [(a + b) / 2 for a, b in pairwise(checkpoint_miles)]
-    boundaries = [0.0, *midpoints, route_miles]
-    return [end - start for start, end in pairwise(boundaries)]
+    return list(pairwise([0.0, *midpoints, route_miles]))
+
+
+def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[float]:
+    """Miles of road each checkpoint speaks for (D1); they always sum to `route_miles`."""
+    return [end - start for start, end in owned_stretches(checkpoint_miles, route_miles)]
 
 
 @dataclass(frozen=True)

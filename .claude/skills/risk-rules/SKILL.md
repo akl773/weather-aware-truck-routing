@@ -70,6 +70,7 @@ Traps:
   duplicate would own zero miles and its level would disappear.
 - **Unknown is `None`, never `Level.LOW`.** A checkpoint without a full forecast has
   `level=None`; its miles go to `unknown_miles`. `mean_level` is `None` when nothing is known.
+  Exception: a known reading that is No Travel on its own decides the level (`plan-api.md` D3).
 - **Readings are classified at the precision shown** (`plan-api.md` D2): the plan service rounds
   before calling `classify`, so a displayed reading always matches its level.
 - **Ties keep the provider's order** because `sorted` is stable. Do not add a tie-breaker that is not
