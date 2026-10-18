@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import type { PlanRequest, PlanResponse } from "../api/client";
 import type { components } from "../api/schema";
-import { type HeatmapView, blendFrames, frameColors } from "../corridor/colors";
+import { type HeatmapView, blendFrames, frameColors, frameHour } from "../corridor/colors";
 import { cellPolygons, heatmapLayer, truckLayer } from "../corridor/heatmapLayers";
 import { Timeline } from "../corridor/Timeline";
 import { useCorridor } from "../corridor/useCorridor";
@@ -78,8 +78,8 @@ export function MapStage({
 
   const layers = [];
   if (polygons && frames && colors) {
-    blendFrames(frames, hour, colors);
-    layers.push(heatmapLayer({ polygons, colors, hour, view }));
+    blendFrames(frames, frameHour(view, hour), colors);
+    layers.push(heatmapLayer({ polygons, colors, hour: frameHour(view, hour), view }));
   }
   layers.push(...routeLayers);
   if (plan && request) {

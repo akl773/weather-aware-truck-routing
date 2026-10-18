@@ -11,23 +11,28 @@ interface Ramp {
   unit: string;
   field: "wind_mph" | "rain_in_hr" | "snow_in_hr";
   stops: readonly (readonly [number, Rgba])[];
+  /** The legend's labels: the reading's band edges, so the scale reads against the risk table. */
+  ticks: readonly number[];
 }
 
 // Low is faintest so the eye goes to the weather that matters (corridor-heatmap D6).
 const LEVEL_ALPHA = [70, 120, 140, 155, 175];
-const UNKNOWN: Rgba = [...UNKNOWN_COLOR, 60];
+export const UNKNOWN_FILL: Rgba = [...UNKNOWN_COLOR, 60];
 
+// Blue and teal hues only, which no level uses, so a reading view is never read as risk.
 export const RAMPS: Record<Exclude<HeatmapView, "risk">, Ramp> = {
   wind: {
     unit: "mph",
     field: "wind_mph",
     stops: [
-      [0, [191, 211, 230, 0]],
-      [15, [158, 188, 218, 90]],
-      [30, [140, 107, 177, 140]],
-      [45, [136, 65, 157, 165]],
-      [55, [110, 1, 107, 185]],
+      [0, [199, 233, 180, 0]],
+      [15, [127, 205, 187, 70]],
+      [25, [65, 182, 196, 115]],
+      [35, [29, 145, 192, 140]],
+      [45, [34, 94, 168, 165]],
+      [55, [12, 44, 132, 185]],
     ],
+    ticks: [25, 35, 45, 55],
   },
   rain: {
     unit: "in/hr",
@@ -40,6 +45,7 @@ export const RAMPS: Record<Exclude<HeatmapView, "risk">, Ramp> = {
       [0.5, [8, 81, 156, 170]],
       [1, [8, 48, 107, 190]],
     ],
+    ticks: [0.1, 0.25, 0.5, 1],
   },
   snow: {
     unit: "in/hr",
@@ -52,6 +58,7 @@ export const RAMPS: Record<Exclude<HeatmapView, "risk">, Ramp> = {
       [2, [8, 104, 172, 170]],
       [3, [8, 64, 129, 190]],
     ],
+    ticks: [0.5, 1, 2, 3],
   },
 };
 
@@ -72,16 +79,16 @@ export function rampColor(ramp: Ramp, value: number): Rgba {
 }
 
 export function levelFill(level: number | null): Rgba {
-  if (level === null) return UNKNOWN;
+  if (level === null) return UNKNOWN_FILL;
   const rgb = LEVEL_COLORS[level];
-  return rgb ? [...rgb, LEVEL_ALPHA[level] as number] : UNKNOWN;
+  return rgb ? [...rgb, LEVEL_ALPHA[level] as number] : UNKNOWN_FILL;
 }
 
 function cellColor(frame: Frame, view: HeatmapView, cell: number): Rgba {
   if (view === "risk") return levelFill(frame.level[cell] ?? null);
   const ramp = RAMPS[view];
   const value = frame[ramp.field][cell];
-  return value === null || value === undefined ? UNKNOWN : rampColor(ramp, value);
+  return value === null || value === undefined ? UNKNOWN_FILL : rampColor(ramp, value);
 }
 
 /** Every frame's RGBA bytes for one view, computed once per corridor (corridor-heatmap D7). */
@@ -92,6 +99,15 @@ export function frameColors(corridor: CorridorResponse, view: HeatmapView): Uint
     for (let cell = 0; cell < cells; cell++) bytes.set(cellColor(frame, view, cell), cell * 4);
     return bytes;
   });
+}
+
+/**
+ * The hour to draw. The risk view shows the nearest frame: blending two levels' colours gives a
+ * third level's colour, which no frame holds. Reading views blend, since their ramps are
+ * continuous (corridor-heatmap D7).
+ */
+export function frameHour(view: HeatmapView, hour: number): number {
+  return view === "risk" ? Math.round(hour) : hour;
 }
 
 /** Frames blended at `hour` into `out`: hour 2.25 is a quarter of the way from frame 2 to 3. */

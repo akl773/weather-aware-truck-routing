@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CorridorResponse } from "../api/client";
 import { LEVEL_COLORS } from "../risk/levels";
-import { RAMPS, blendFrames, frameColors, levelFill, rampColor } from "./colors";
+import { RAMPS, blendFrames, frameColors, frameHour, levelFill, rampColor } from "./colors";
 
 function frame(hour: number, level: (number | null)[], wind: (number | null)[]) {
   return {
@@ -51,7 +51,9 @@ describe("reading ramps (corridor-heatmap D6)", () => {
   });
 
   it("is linear between stops", () => {
-    expect(rampColor(RAMPS.wind, 22.5)).toEqual([149, 148, 198, 115]);
+    const [lo, hi] = [RAMPS.wind.stops[1], RAMPS.wind.stops[2]];
+    const mid = rampColor(RAMPS.wind, ((lo?.[0] ?? 0) + (hi?.[0] ?? 0)) / 2);
+    expect(mid[3]).toBe(Math.round(((lo?.[1][3] ?? 0) + (hi?.[1][3] ?? 0)) / 2));
   });
 });
 
@@ -72,5 +74,27 @@ describe("blendFrames (corridor-heatmap D7)", () => {
   it("clamps hours outside the frames", () => {
     expect([...blendFrames(frames, -2, new Uint8ClampedArray(4))]).toEqual([0, 100, 200, 40]);
     expect([...blendFrames(frames, 9, new Uint8ClampedArray(4))]).toEqual([100, 100, 0, 80]);
+  });
+});
+
+describe("frameHour (corridor-heatmap D7)", () => {
+  it("shows the risk view's nearest frame, since a blend of two levels' colours is a third level's", () => {
+    expect(frameHour("risk", 2.25)).toBe(2);
+    expect(frameHour("risk", 2.5)).toBe(3);
+  });
+
+  it("blends the reading views between frames", () => {
+    expect(frameHour("wind", 2.25)).toBe(2.25);
+  });
+});
+
+describe("ramp ticks (corridor-heatmap D6)", () => {
+  it("label each reading's band edges, ending at its No Travel threshold", () => {
+    expect(RAMPS.wind.ticks).toEqual([25, 35, 45, 55]);
+    expect(RAMPS.rain.ticks).toEqual([0.1, 0.25, 0.5, 1]);
+    expect(RAMPS.snow.ticks).toEqual([0.5, 1, 2, 3]);
+    for (const ramp of Object.values(RAMPS)) {
+      expect(ramp.stops.at(-1)?.[0]).toBe(ramp.ticks.at(-1));
+    }
   });
 });
