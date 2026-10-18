@@ -5,7 +5,7 @@ gets three route options, reads the forecast at the truck's ETA every 10, 25 or 
 risk with load-aware rules, and recommends a route. A 0–48 hour heatmap shows the weather across the
 trip corridor.
 
-> Work in progress. Live link and walkthrough arrive with the deploy (#15, #16).
+**Live:** https://spotter.akhilsingh.in (the footer shows the deployed commit)
 
 ## Run locally
 
@@ -16,6 +16,11 @@ cp backend/.env.example backend/.env   # optional for now
 make dev                               # http://localhost:5173
 make sanity                            # every gate CI runs
 ```
+
+## Deploy
+
+`make deploy` builds both images locally, ships them to the VM over SSH and waits until the live
+API reports the new commit. Details: [deployment decisions](docs/decisions/deployment.md).
 
 ## Documentation
 
