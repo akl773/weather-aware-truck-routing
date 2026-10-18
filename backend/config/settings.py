@@ -29,6 +29,9 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+# Routing and place search (routing D1). Server-side only; the browser never sees it.
+STADIA_API_KEY = os.environ.get("STADIA_API_KEY", "")
+
 # Reported by /api/health so the live site can be matched to a commit.
 GIT_SHA = os.environ.get("GIT_SHA", "dev")
 
@@ -50,7 +53,13 @@ DATABASES: dict = {}
 REDIS_URL = os.environ.get("REDIS_URL", "")
 CACHES = {
     "default": (
-        {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}
+        {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            # A Redis that hangs must fail fast, so the fail-open cache costs latency, not a
+            # request (routing D7).
+            "OPTIONS": {"socket_connect_timeout": 0.5, "socket_timeout": 0.5},
+        }
         if REDIS_URL
         else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
     )
@@ -62,6 +71,7 @@ REST_FRAMEWORK = {
     "UNAUTHENTICATED_USER": None,
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "trips.errors.exception_handler",
 }
 
 SPECTACULAR_SETTINGS = {
@@ -80,4 +90,6 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+    # httpx logs every request URL at INFO, and provider keys travel in the query string.
+    "loggers": {"httpx": {"level": "WARNING"}, "httpcore": {"level": "WARNING"}},
 }

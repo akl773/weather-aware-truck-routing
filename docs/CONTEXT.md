@@ -9,12 +9,14 @@ terms. If a new concept needs a name, add it here in the same PR.
   interval.
 - **Departure time**: when the truck leaves the origin. Stored timezone-aware in UTC; shown in the
   origin's local time.
-- **Load weight**: gross load in pounds (lb). Only the load rules read it.
+- **Load weight**: the cargo's weight in pounds (lb). The load rules read it, and the routing
+  provider gets it added to a 35,000 lb empty tractor-trailer as the truck's weight.
 - **Sampling interval**: distance between checkpoints: 10, 25 or 50 miles.
 
 ## Routes
 
 - **Route**: one option returned for a trip. A polyline plus driving time per span.
+- **Place**: a picked autocomplete suggestion: a label and its coordinates.
 - **Span**: a stretch of polyline with its own driving duration, as the routing provider reports it.
   ETAs come from spans, not from an average speed.
 - **Fallback route**: a route produced by routing through an offset via point, used when the provider

@@ -13,6 +13,8 @@ Backend rules on top of the root `AGENTS.md`.
 - **Numbers shown to the user are rounded once, here,** with `risk.scoring.display_round` (half up;
   No Travel miles round up). The API sends rounded values; the frontend only pads them to fixed
   decimals and never rounds a raw value itself.
+- **Provider details stop at the adapter.** Field names, units, error codes and keys stay in
+  `providers/<provider>.py`. Recipes: `.claude/skills/provider-adapter/`.
 - **No reading is ever defaulted to zero.** Missing or impossible values raise or are marked
   unknown, because zero means "calm" and reads as Low.
 
@@ -22,6 +24,8 @@ Backend rules on top of the root `AGENTS.md`.
 |---|---|
 | `config/` | settings, URLs, health endpoint |
 | `risk/` | classification, load rules, ranking (pure) |
+| `providers/` | routing, places and weather adapters; geometry; provider cache |
+| `trips/` | API views, serializers and the provider-error mapping |
 | `tests/` | pytest; mirrors the package layout |
 
 ## Commands
