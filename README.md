@@ -5,7 +5,17 @@ gets three route options, reads the forecast at the truck's ETA every 10, 25 or 
 risk with load-aware rules, and recommends a route. A 0–48 hour heatmap shows the weather across the
 trip corridor.
 
-> Work in progress. Live link, walkthrough and quickstart arrive with the deploy (#15, #16).
+> Work in progress. Live link and walkthrough arrive with the deploy (#15, #16).
+
+## Run locally
+
+Requires Docker, [uv](https://docs.astral.sh/uv/) and Node 24.
+
+```bash
+cp backend/.env.example backend/.env   # optional for now
+make dev                               # http://localhost:5173
+make sanity                            # every gate CI runs
+```
 
 ## Documentation
 
