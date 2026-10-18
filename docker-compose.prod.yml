@@ -1,0 +1,35 @@
+# Production stack on the shared VM (docs/decisions/deployment.md). The VM never builds: deploy.sh
+# ships the images and writes IMAGE_TAG into .env next to this file. Only nginx is published.
+name: spotter
+
+services:
+  web:
+    image: spotter-web:${IMAGE_TAG:?IMAGE_TAG is set by deploy.sh}
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      # Loopback only: the Cloudflare tunnel on the host reaches it (deployment D2, D3).
+      - "127.0.0.1:8150:80"
+    mem_limit: 64m
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  api:
+    image: spotter-api:${IMAGE_TAG:?IMAGE_TAG is set by deploy.sh}
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: ./api.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    mem_limit: 512m
+    logging: *logging
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    # A bounded cache of provider responses; nothing in it is worth persisting (deployment D6).
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru",
+              "--save", "", "--appendonly", "no"]
+    mem_limit: 192m
+    logging: *logging
