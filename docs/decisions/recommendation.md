@@ -38,6 +38,7 @@ Rejected: a mean weighted by time, because travel time is already ranking key 4 
 Enforced by: `risk.scoring.summarize_route`; `test_mean_level_is_weighted_by_owned_miles`.
 
 ### D3. Routes rank by (No Travel miles, Severe miles, High miles, mean level, duration)
+(Unknown miles join after No Travel miles in D7.)
 The spec's order is Severe miles, High miles, average risk, travel time. It never mentions No Travel,
 the level it defines as worse than Severe. No Travel miles go first, so a route that crosses No Travel
 can be shown and compared but never beats one that does not. To keep that true at display
@@ -79,6 +80,21 @@ best route." Keys that tied are not mentioned, so the reason never credits the w
 difference that did not matter.
 Rejected: listing every metric of the winner, because it does not say why it won.
 Enforced by: `risk.recommendation._explain`; `test_reason_*`.
+
+### D7. Miles without a forecast rank right after No Travel miles
+A checkpoint with an unknown level (plan-api D3) owns its stretch like any other, but those miles
+are counted as unknown, not at any level. The ranking becomes (No Travel miles, unknown miles,
+Severe miles, High miles, mean level, duration). Unknown miles round up like No Travel miles, and
+the mean level is taken over the known miles only. A route whose weather cannot be vouched for
+never beats one that can, unless the known one crosses No Travel, which stays the one thing worse
+than not knowing. A route with no known miles has no mean level and ranks as if it were all No
+Travel on that key.
+Rejected: treating unknown as Low, because missing data would read as calm (backend invariant).
+Rejected: treating unknown as No Travel, because a gap at the forecast's end would outrank a real
+No Travel warning.
+Enforced by: `risk.scoring.summarize_route`, `risk.recommendation.ranking_values`;
+`test_unknown_miles_rank_after_no_travel_and_before_severe`,
+`test_mean_level_ignores_unknown_miles`, `test_a_sliver_of_unknown_miles_counts`.
 
 ## Open questions
 
