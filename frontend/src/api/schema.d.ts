@@ -78,6 +78,16 @@ export interface components {
             gusty: boolean;
         };
         /**
+         * @description * `no_travel_miles` - no_travel_miles
+         *     * `unknown_miles` - unknown_miles
+         *     * `severe_miles` - severe_miles
+         *     * `high_miles` - high_miles
+         *     * `mean_level` - mean_level
+         *     * `duration` - duration
+         * @enum {string}
+         */
+        DecidedByEnum: "no_travel_miles" | "unknown_miles" | "severe_miles" | "high_miles" | "mean_level" | "duration";
+        /**
          * @description * `wind` - wind
          *     * `rain` - rain
          *     * `snow` - snow
@@ -97,6 +107,13 @@ export interface components {
             /** @description Git SHA of the running build. */
             version: string;
         };
+        /**
+         * @description * `A` - A
+         *     * `B` - B
+         *     * `C` - C
+         * @enum {string}
+         */
+        IdEnum: "A" | "B" | "C";
         /**
          * @description * `10` - 10
          *     * `25` - 25
@@ -118,6 +135,8 @@ export interface components {
             /** Format: double */
             unknown: number;
         };
+        /** @enum {unknown} */
+        NullEnum: null;
         Place: {
             label: string;
             /** Format: double */
@@ -150,14 +169,24 @@ export interface components {
             snow_in_hr: number | null;
         };
         Recommendation: {
-            route_id: string;
-            ranking: string[];
-            decided_by: string | null;
+            route_id: components["schemas"]["IdEnum"];
+            ranking: components["schemas"]["IdEnum"][];
+            /**
+             * @description The first ranking key separating the top two routes; null if nothing does.
+             *
+             *     * `no_travel_miles` - no_travel_miles
+             *     * `unknown_miles` - unknown_miles
+             *     * `severe_miles` - severe_miles
+             *     * `high_miles` - high_miles
+             *     * `mean_level` - mean_level
+             *     * `duration` - duration
+             */
+            decided_by: (components["schemas"]["DecidedByEnum"] | components["schemas"]["NullEnum"]) | null;
             reason: string;
             all_routes_cross_no_travel: boolean;
         };
         Route: {
-            id: string;
+            id: components["schemas"]["IdEnum"];
             /** @description Forced through a via point (routing D4). */
             fallback: boolean;
             /** @description [longitude, latitude, mile] for each point of the simplified route. */

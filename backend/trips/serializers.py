@@ -1,6 +1,6 @@
 """Plan request and response shapes (plan-api.md). Every number sent is the number shown."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.utils.dateparse import parse_datetime
@@ -11,7 +11,7 @@ from risk.levels import Level
 from risk.recommendation import RankingKey, ranking_values
 from risk.scoring import display_round
 from trips.checkpoints import DEFAULT_INTERVAL_MI, INTERVALS_MI
-from trips.plan import Plan, PlannedCheckpoint, PlannedRoute
+from trips.plan import ROUTE_IDS, Plan, PlannedCheckpoint, PlannedRoute
 
 MAX_LOAD_LB = 80_000
 DEPARTURE_PAST = timedelta(hours=1)
@@ -29,7 +29,12 @@ class AwareDateTimeField(serializers.DateTimeField):
     """An ISO 8601 date-time that must carry its UTC offset (D1)."""
 
     def to_internal_value(self, value: Any):
-        parsed = parse_datetime(value) if isinstance(value, str) else None
+        parsed = value if isinstance(value, datetime) else None
+        if isinstance(value, str):
+            try:
+                parsed = parse_datetime(value)
+            except ValueError:
+                parsed = None  # A well-formed but impossible date; DRF rejects it below.
         if parsed is not None and parsed.tzinfo is None:
             raise serializers.ValidationError(
                 "Include the UTC offset, e.g. 2026-10-20T06:00:00-05:00."
@@ -106,7 +111,7 @@ class SummarySerializer(serializers.Serializer):
 
 
 class RouteSerializer(serializers.Serializer):
-    id = serializers.CharField()
+    id = serializers.ChoiceField(choices=ROUTE_IDS)
     fallback = serializers.BooleanField(help_text="Forced through a via point (routing D4).")
     path = serializers.ListField(
         child=serializers.ListField(child=serializers.FloatField(), min_length=3, max_length=3),
@@ -117,9 +122,13 @@ class RouteSerializer(serializers.Serializer):
 
 
 class RecommendationSerializer(serializers.Serializer):
-    route_id = serializers.CharField()
-    ranking = serializers.ListField(child=serializers.CharField())
-    decided_by = serializers.CharField(allow_null=True)
+    route_id = serializers.ChoiceField(choices=ROUTE_IDS)
+    ranking = serializers.ListField(child=serializers.ChoiceField(choices=ROUTE_IDS))
+    decided_by = serializers.ChoiceField(
+        choices=[key.value for key in RankingKey],
+        allow_null=True,
+        help_text="The first ranking key separating the top two routes; null if nothing does.",
+    )
     reason = serializers.CharField()
     all_routes_cross_no_travel = serializers.BooleanField()
 

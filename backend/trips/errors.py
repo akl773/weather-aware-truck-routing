@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from django.core.exceptions import RequestDataTooBig
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -27,6 +28,8 @@ def exception_handler(exc: Exception, context: dict[str, Any]) -> Response | Non
         return Response({"detail": str(exc)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
     if isinstance(exc, ProviderError):
         return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+    if isinstance(exc, RequestDataTooBig):
+        return Response({"detail": "The request is too large."}, status=status.HTTP_400_BAD_REQUEST)
     if isinstance(exc, ValidationError):
         return Response(
             {"detail": _first_message(exc.detail), "fields": exc.detail},
