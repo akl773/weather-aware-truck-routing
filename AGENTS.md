@@ -28,6 +28,21 @@ TypeScript frontend, MapLibre + deck.gl map.
 - `docs/`: spec, context, decisions, workflow, backlog.
 - `.claude/skills/`: task recipes for agents (changing a risk rule, adding a provider, deploying).
 
+## Commands
+
+Run from the repo root. `make help` lists every target.
+
+| Command | What it does |
+|---|---|
+| `make dev` | api on :8000, web on :5173 (proxies `/api`), redis; all reload on save |
+| `make check` | ruff lint + format check, eslint, `tsc`. The pre-push hook runs this |
+| `make test` | pytest and vitest |
+| `make sanity` | everything CI runs: check, test and the production web build |
+| `make api-types` | regenerate `frontend/src/api/schema.d.ts` after any serializer change |
+| `make hooks-install` | gitleaks on commit, `make check` on push |
+
+CI runs the same gates and also fails when `schema.d.ts` is out of date with the backend schema.
+
 ## Architecture rules
 
 - `risk/` imports nothing from Django, does no I/O, and reads no clock. Everything it needs comes in
