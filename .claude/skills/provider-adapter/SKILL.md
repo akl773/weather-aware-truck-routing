@@ -5,7 +5,7 @@ description: How routing, geocoding and weather providers are wrapped in backend
 
 # Provider adapters
 
-Decisions: `docs/decisions/routing.md` (D1–D8), and `weather.md` once it exists. Read them first.
+Decisions: `docs/decisions/routing.md` (D1–D8) and `weather.md` (D1–D6). Read them first.
 
 ## The boundary
 
@@ -14,7 +14,8 @@ Decisions: `docs/decisions/routing.md` (D1–D8), and `weather.md` once it exist
 | `providers/geo.py` | `Point`, distances, polyline decoding, resampling, overlap, via-point offset. Pure |
 | `providers/routing.py` | `Route` (points, cumulative miles and seconds), `Router` protocol, `plan_routes` |
 | `providers/stadia.py` | Valhalla request/response, weight conversion, error mapping, `default()` client |
-| `providers/cache.py` | `fetch_cached`: raw responses in Redis, fail-open |
+| `providers/open_meteo.py` | hourly `Series` per 0.05° lattice point, batched, fetch window, units |
+| `providers/cache.py` | `fetch_cached`, `fetch_many_cached` (per item, cached batch by batch): raw responses in Redis, fail-open |
 | `providers/errors.py` | `ProviderError` (502) and `NoRouteError` (422), mapped in `trips/errors.py` |
 
 Provider field names, units and error codes never leave the adapter module. If a view or `risk/`
@@ -24,7 +25,10 @@ needs a provider field, add it to `Route` (or the weather equivalent) in app uni
 
 1. Edit the adapter. Bump the cache namespace (`stadia:route:v1` → `v2`) when the response shape
    or meaning changes, so old cached responses are not parsed by new code.
-2. Re-record: `cd backend && STADIA_API_KEY=... uv run python -m tests.providers.record_fixtures`.
+2. Re-record: `cd backend && STADIA_API_KEY=... uv run python -m tests.providers.record_fixtures`,
+   optionally with name prefixes (`openmeteo`, `stadia_route`) to record only those scenarios.
+   Weather scenarios start at a fixed hour that must be inside the live forecast when recording;
+   move `WEATHER_START` in `scenarios.py` forward if the recorder gets a 400.
    The key lives in `~/.config/spotter/stadia.env` on the maintainer's machine, never in the repo.
 3. Read the recorder's summary line per scenario (request count, size). A changed request count
    means fallback behaviour changed; check the tests say why.

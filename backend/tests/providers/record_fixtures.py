@@ -1,6 +1,8 @@
 """Record the Stadia fixtures from the live API (routing D8).
 
-    cd backend && STADIA_API_KEY=... uv run python -m tests.providers.record_fixtures
+    cd backend && STADIA_API_KEY=... uv run python -m tests.providers.record_fixtures [prefix ...]
+
+With prefixes, only scenarios whose names start with one of them are recorded, e.g. `openmeteo`.
 
 Each scenario runs through the real adapter, so the recording holds exactly the requests the code
 makes, including fallbacks. The key is stripped from every saved request. Re-record after changing
@@ -18,11 +20,18 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 os.environ.setdefault("DJANGO_SECRET_KEY", "fixture-recorder")
 django.setup()
 
-from providers import stadia  # noqa: E402
+from providers import open_meteo, stadia  # noqa: E402
 from providers.errors import NoRouteError  # noqa: E402
 from providers.routing import plan_routes  # noqa: E402
 from tests.providers.replay import FIXTURES, request_signature  # noqa: E402
-from tests.providers.scenarios import LOAD_LB, PLACES_SCENARIOS, ROUTE_SCENARIOS  # noqa: E402
+from tests.providers.scenarios import (  # noqa: E402
+    LOAD_LB,
+    PLACES_SCENARIOS,
+    ROUTE_SCENARIOS,
+    WEATHER_HOURS,
+    WEATHER_SCENARIOS,
+    WEATHER_START,
+)
 
 
 class RecordingTransport(httpx.BaseTransport):
@@ -42,15 +51,19 @@ class RecordingTransport(httpx.BaseTransport):
         return response
 
 
-def record(name: str, run) -> None:
+def record(name: str, run, base_url: str = stadia.BASE_URL) -> None:
+    wanted = sys.argv[1:]
+    if wanted and not any(name.startswith(prefix) for prefix in wanted):
+        return
     transport = RecordingTransport()
-    client = httpx.Client(base_url=stadia.BASE_URL, timeout=stadia.TIMEOUT, transport=transport)
+    client = httpx.Client(base_url=base_url, timeout=60, transport=transport)
     try:
-        run(stadia.StadiaMaps(client, os.environ["STADIA_API_KEY"]))
+        run(client)
     except NoRouteError as exc:
         print(f"{name}: NoRouteError({exc})")
     text = json.dumps(transport.recorded, separators=(",", ":"))
-    if os.environ["STADIA_API_KEY"] in text:
+    secret = os.environ.get("STADIA_API_KEY")
+    if secret and secret in text:
         sys.exit(f"{name}: the API key leaked into the recording; nothing written")
     (FIXTURES / f"{name}.json").write_text(text + "\n")
     print(f"{name}: {len(transport.recorded)} requests, {len(text) // 1024} KB")
@@ -63,10 +76,29 @@ def main() -> None:
     with override_settings(
         CACHES={"default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}}
     ):
+        key = os.environ.get("STADIA_API_KEY", "")
         for name, (origin, destination) in ROUTE_SCENARIOS.items():
-            record(name, lambda maps, o=origin, d=destination: plan_routes(maps, o, d, LOAD_LB))
+            record(
+                name,
+                lambda c, o=origin, d=destination: plan_routes(
+                    stadia.StadiaMaps(c, key), o, d, LOAD_LB
+                ),
+            )
         for name, text in PLACES_SCENARIOS.items():
-            record(name, lambda maps, t=text: maps.autocomplete(t))
+            record(name, lambda c, t=text: stadia.StadiaMaps(c, key).autocomplete(t))
+        for name, (points, batch_size) in WEATHER_SCENARIOS.items():
+            original = open_meteo.BATCH_SIZE
+            open_meteo.BATCH_SIZE = batch_size or original
+            try:
+                record(
+                    name,
+                    lambda c, p=points: open_meteo.OpenMeteo(c).hourly(
+                        p, WEATHER_START, WEATHER_HOURS
+                    ),
+                    base_url=open_meteo.BASE_URL,
+                )
+            finally:
+                open_meteo.BATCH_SIZE = original
 
 
 if __name__ == "__main__":
