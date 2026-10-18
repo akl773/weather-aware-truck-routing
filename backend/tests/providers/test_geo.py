@@ -12,6 +12,7 @@ from providers.geo import (
     offset_point,
     overlap_share,
     resample,
+    simplify,
 )
 
 CHICAGO = Point(41.8781, -87.6298)
@@ -106,3 +107,25 @@ def test_offset_point_goes_left_of_travel_for_positive_offsets():
 def test_offset_point_rejects_identical_ends():
     with pytest.raises(ValueError, match="same point"):
         offset_point(CHICAGO, CHICAGO, CHICAGO, 10)
+
+
+def test_simplify_drops_points_on_a_straight_line():
+    line = straight_line(100, step=1)
+    assert simplify(line, 0.0005) == [0, len(line) - 1]
+
+
+def test_simplify_keeps_a_corner():
+    corner = [Point(40, -100), Point(40, -99.5), Point(40, -99), Point(40.5, -99), Point(41, -99)]
+    assert simplify(corner, 0.0005) == [0, 2, 4]
+
+
+def test_simplify_keeps_detail_above_the_tolerance_only():
+    wiggle = [Point(40, -100), Point(40.0004, -99.5), Point(40, -99)]
+    assert simplify(wiggle, 0.0005) == [0, 2]
+    assert simplify(wiggle, 0.0003) == [0, 1, 2]
+
+
+def test_simplify_short_inputs_are_kept():
+    assert simplify([], 0.1) == []
+    assert simplify([CHICAGO], 0.1) == [0]
+    assert simplify([CHICAGO, DENVER], 0.1) == [0, 1]
