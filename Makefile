@@ -43,7 +43,11 @@ test-web: $(WEB_DEPS)
 build-web: $(WEB_DEPS)
 	$(WEB) npm run build
 
-sanity: check test build-web ## Everything CI runs
+e2e: $(WEB_DEPS) ## Plan a trip and scrub the slider in Chromium, against recorded API answers
+	$(WEB) npx playwright install chromium
+	$(WEB) npm run e2e
+
+sanity: check test build-web e2e ## Everything CI runs
 	@echo "sanity: all gates passed"
 
 fmt: ## Format backend code
