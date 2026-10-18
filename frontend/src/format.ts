@@ -4,14 +4,19 @@ export function zoneName(at: Date = new Date()): string {
   return parts.find((part) => part.type === "timeZoneName")?.value ?? "";
 }
 
-/** "Mon 2:05 PM" in the browser's zone (ui D3). */
+// Built once: a formatter costs far more to create than to use, and a plan formats hundreds of
+// ETAs. It reads the browser's zone when created, which does not change while the page is open.
+const TIME = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** "Mon, Oct 19, 2:05 PM" in the browser's zone (ui D3); the date tells a week's days apart. */
 export function formatTime(iso: string | Date): string {
-  const time = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return time.format(typeof iso === "string" ? new Date(iso) : iso);
+  return TIME.format(typeof iso === "string" ? new Date(iso) : iso);
 }
 
 /** "7 h 23 min", "45 min". */

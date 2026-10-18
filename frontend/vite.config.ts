@@ -27,5 +27,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Set before any module loads, so formatters built at import time use it too.
+    env: { TZ: "America/Denver" },
   },
 });

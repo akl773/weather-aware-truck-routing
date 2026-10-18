@@ -1,18 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { formatDuration, formatMiles, formatReading, formatTime } from "./format";
 
-const ORIGINAL_TZ = process.env.TZ;
-beforeEach(() => {
-  process.env.TZ = "America/Denver";
-});
-afterEach(() => {
-  process.env.TZ = ORIGINAL_TZ;
-});
-
 describe("formatting (ui D3, recommendation D4)", () => {
-  it("shows times in the browser's zone", () => {
-    expect(formatTime("2026-10-19T20:05:00Z")).toBe("Mon 2:05 PM");
+  // The browser's zone is America/Denver in every test (vite.config.ts).
+  it("shows times in the browser's zone, with the date", () => {
+    expect(formatTime("2026-10-19T20:05:00Z")).toBe("Mon, Oct 19, 2:05 PM");
   });
 
   it("writes durations in hours and minutes", () => {
