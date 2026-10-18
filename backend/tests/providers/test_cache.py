@@ -1,13 +1,7 @@
 import pytest
-from django.core.cache import cache
 
 from providers import cache as provider_cache
 from providers.cache import fetch_cached, request_key
-
-
-@pytest.fixture(autouse=True)
-def clear_cache():
-    cache.clear()
 
 
 def test_second_fetch_is_served_from_the_cache():
