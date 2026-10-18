@@ -29,5 +29,7 @@ export default defineConfig({
     environment: "node",
     // Set before any module loads, so formatters built at import time use it too.
     env: { TZ: "America/Denver" },
+    // Playwright runs e2e/ on its own.
+    include: ["src/**/*.test.ts"],
   },
 });
