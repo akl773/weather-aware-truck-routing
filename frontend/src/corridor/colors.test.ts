@@ -28,7 +28,7 @@ const CORRIDOR: CorridorResponse = {
 describe("risk view (corridor-heatmap D6)", () => {
   it("uses the level's colour, Low faintest", () => {
     const [low, noTravel] = [levelFill(0), levelFill(4)];
-    expect(low.slice(0, 3)).toEqual([...(LEVEL_COLORS[0] as number[])]);
+    expect(low.slice(0, 3)).toEqual([...(LEVEL_COLORS[0] ?? [])]);
     expect(low[3]).toBeLessThan(noTravel[3]);
   });
 
@@ -56,7 +56,10 @@ describe("reading ramps (corridor-heatmap D6)", () => {
 });
 
 describe("blendFrames (corridor-heatmap D7)", () => {
-  const frames = [new Uint8ClampedArray([0, 100, 200, 40]), new Uint8ClampedArray([100, 100, 0, 80])];
+  const frames = [
+    new Uint8ClampedArray([0, 100, 200, 40]),
+    new Uint8ClampedArray([100, 100, 0, 80]),
+  ];
 
   it("returns a frame exactly on its hour", () => {
     expect([...blendFrames(frames, 1, new Uint8ClampedArray(4))]).toEqual([100, 100, 0, 80]);

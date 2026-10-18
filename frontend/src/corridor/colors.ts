@@ -102,6 +102,7 @@ export function blendFrames(frames: Uint8ClampedArray[], hour: number, out: Uint
   const a = frames[lo] as Uint8ClampedArray;
   const b = frames[Math.min(lo + 1, last)] as Uint8ClampedArray;
   const t = clamped - lo;
-  for (let i = 0; i < out.length; i++) out[i] = (a[i] as number) + ((b[i] as number) - (a[i] as number)) * t;
+  for (let i = 0; i < out.length; i++)
+    out[i] = (a[i] as number) + ((b[i] as number) - (a[i] as number)) * t;
   return out;
 }
