@@ -1,0 +1,49 @@
+# Local development stack: `make dev`. Source is bind-mounted, so both servers reload on save.
+# Production uses docker-compose.prod.yml (#15).
+name: truck-routing-dev
+
+services:
+  api:
+    build:
+      context: ./backend
+      target: dev
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,api"
+      REDIS_URL: redis://redis:6379/0
+      GIT_SHA: dev
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./backend:/app
+      # Keep the image's Linux virtualenv instead of the host's.
+      - /app/.venv
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund && npx vite --host 0.0.0.0 --port 5173"
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Keep Linux node_modules inside the container.
+      - /app/node_modules
+    depends_on:
+      - api
+
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

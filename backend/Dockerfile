@@ -8,7 +8,13 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 
-FROM python:3.14-slim
+# Local development: dev dependencies and the auto-reloading server. Source is bind-mounted.
+FROM build AS dev
+RUN uv sync --frozen
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+FROM python:3.14-slim AS runtime
 ARG GIT_SHA=dev
 RUN useradd --system --uid 10001 --no-create-home app
 WORKDIR /app
