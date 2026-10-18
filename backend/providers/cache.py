@@ -8,6 +8,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from providers.errors import ProviderError
+
 log = logging.getLogger(__name__)
 
 
@@ -39,12 +41,17 @@ def fetch_cached[T](key: str, ttl_s: int, fetch: Callable[[], T]) -> T:
 
 
 def fetch_many_cached[T](
-    keys: dict[str, Any], ttl_s: int, fetch: Callable[[list[Any]], dict[Any, T]]
+    keys: dict[str, Any],
+    ttl_s: int,
+    fetch: Callable[[list[Any]], dict[Any, T]],
+    batch_size: int,
 ) -> dict[Any, T]:
     """Like `fetch_cached` for many items at once: `keys` maps cache key to item.
 
-    Items missing from the cache are passed to `fetch` in one call, which returns a value per item.
-    Cache failures are logged and treated as misses (stack D3).
+    Items missing from the cache go to `fetch` in batches of `batch_size`, and each batch is cached
+    as soon as it returns, so a failure part-way keeps the batches already paid for (weather D4).
+    `fetch` must return a value for every item it was given. Cache failures are logged and treated
+    as misses (stack D3).
     """
     try:
         hits = cache.get_many(list(keys))
@@ -52,13 +59,15 @@ def fetch_many_cached[T](
         log.warning("cache read failed for %d keys; calling the provider", len(keys), exc_info=True)
         hits = {}
     found = {keys[key]: value for key, value in hits.items() if key in keys}
-    missing = [item for key, item in keys.items() if key not in hits]
-    if missing:
-        fetched = fetch(missing)
+    missing = [(key, item) for key, item in keys.items() if key not in hits]
+    for i in range(0, len(missing), batch_size):
+        batch = missing[i : i + batch_size]
+        fetched = fetch([item for _, item in batch])
+        if fetched.keys() != {item for _, item in batch}:
+            raise ProviderError("The provider answered for different items than were asked.")
         found.update(fetched)
-        by_item = {item: key for key, item in keys.items()}
         try:
-            cache.set_many({by_item[item]: value for item, value in fetched.items()}, ttl_s)
+            cache.set_many({key: fetched[item] for key, item in batch}, ttl_s)
         except Exception:
-            log.warning("cache write failed for %d keys", len(fetched), exc_info=True)
+            log.warning("cache write failed for %d keys", len(batch), exc_info=True)
     return found
