@@ -37,10 +37,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Three routes ranked by forecast risk at the truck's ETA (plan-api.md). */
+        post: operations["plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Checkpoint: {
+            /** Format: double */
+            mile: number;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lon: number;
+            /** Format: date-time */
+            eta: string;
+            /** Format: double */
+            owned_from_mi: number;
+            /** Format: double */
+            owned_to_mi: number;
+            readings: components["schemas"]["Readings"];
+            /** @description 0 Low to 4 No Travel; null unknown. */
+            level: number | null;
+            drivers: components["schemas"]["DriversEnum"][];
+            gusty: boolean;
+        };
+        /**
+         * @description * `wind` - wind
+         *     * `rain` - rain
+         *     * `snow` - snow
+         * @enum {string}
+         */
+        DriversEnum: "wind" | "rain" | "snow";
         Error: {
             /** @description What went wrong, ready to show to the user. */
             detail: string;
@@ -54,12 +97,89 @@ export interface components {
             /** @description Git SHA of the running build. */
             version: string;
         };
+        /**
+         * @description * `10` - 10
+         *     * `25` - 25
+         *     * `50` - 50
+         * @enum {integer}
+         */
+        IntervalMiEnum: 10 | 25 | 50;
+        MilesByLevel: {
+            /** Format: double */
+            low: number;
+            /** Format: double */
+            moderate: number;
+            /** Format: double */
+            high: number;
+            /** Format: double */
+            severe: number;
+            /** Format: double */
+            no_travel: number;
+            /** Format: double */
+            unknown: number;
+        };
         Place: {
             label: string;
             /** Format: double */
             lat: number;
             /** Format: double */
             lon: number;
+        };
+        PlanRequest: {
+            origin: components["schemas"]["Place"];
+            destination: components["schemas"]["Place"];
+            /** Format: date-time */
+            departure: string;
+            load_lb: number;
+            /** @default 25 */
+            interval_mi: components["schemas"]["IntervalMiEnum"];
+        };
+        PlanResponse: {
+            routes: components["schemas"]["Route"][];
+            recommendation: components["schemas"]["Recommendation"];
+            weather: components["schemas"]["WeatherWindow"];
+        };
+        Readings: {
+            /** Format: double */
+            wind_mph: number | null;
+            /** Format: double */
+            gust_mph: number | null;
+            /** Format: double */
+            rain_in_hr: number | null;
+            /** Format: double */
+            snow_in_hr: number | null;
+        };
+        Recommendation: {
+            route_id: string;
+            ranking: string[];
+            decided_by: string | null;
+            reason: string;
+            all_routes_cross_no_travel: boolean;
+        };
+        Route: {
+            id: string;
+            /** @description Forced through a via point (routing D4). */
+            fallback: boolean;
+            /** @description [longitude, latitude, mile] for each point of the simplified route. */
+            path: number[][];
+            summary: components["schemas"]["Summary"];
+            checkpoints: components["schemas"]["Checkpoint"][];
+        };
+        Summary: {
+            /** Format: double */
+            distance_mi: number;
+            duration_min: number;
+            miles_by_level: components["schemas"]["MilesByLevel"];
+            /**
+             * Format: double
+             * @description 0 to 4; null if all unknown.
+             */
+            mean_level: number | null;
+        };
+        WeatherWindow: {
+            /** Format: date-time */
+            start: string;
+            hours: number;
         };
     };
     responses: never;
@@ -110,6 +230,55 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PlanRequest"];
+                "multipart/form-data": components["schemas"]["PlanRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
