@@ -65,6 +65,7 @@ REST_FRAMEWORK = {
     "UNAUTHENTICATED_USER": None,
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "trips.errors.exception_handler",
 }
 
 SPECTACULAR_SETTINGS = {
