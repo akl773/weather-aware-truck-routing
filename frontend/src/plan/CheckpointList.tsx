@@ -5,7 +5,7 @@ import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { type KeyboardEvent, memo, useState } from "react";
 
 import type { components } from "../api/schema";
 import { formatReading, formatTime } from "../format";
@@ -18,9 +18,31 @@ interface CheckpointListProps {
   onHighlight: (index: number | null) => void;
 }
 
-/** Every checkpoint of the selected route, readable without the map (#13 acceptance). */
-export function CheckpointList({ route, onHighlight }: CheckpointListProps) {
+/**
+ * Every checkpoint of the selected route, readable without the map (#13 acceptance). The list is
+ * one tab stop; the arrow keys move between rows, as in a listbox.
+ */
+export const CheckpointList = memo(function CheckpointList({ route, onHighlight }: CheckpointListProps) {
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const last = route.checkpoints.length - 1;
+  const current = Math.min(active, last);
+
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    const moves: Record<string, number> = {
+      ArrowDown: current + 1,
+      ArrowUp: current - 1,
+      Home: 0,
+      End: last,
+    };
+    const next = moves[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    const target = Math.max(0, Math.min(last, next));
+    setActive(target);
+    event.currentTarget.querySelectorAll<HTMLElement>("li")[target]?.focus();
+  };
+
   return (
     <Box>
       <Button
@@ -33,12 +55,13 @@ export function CheckpointList({ route, onHighlight }: CheckpointListProps) {
       >
         {open ? "Hide" : "Show"} {route.checkpoints.length} checkpoints on Route {route.id}
       </Button>
-      <Collapse in={open}>
+      <Collapse in={open} unmountOnExit>
         <Box
           id="checkpoint-list"
           component="ol"
           aria-label={`Checkpoints on Route ${route.id}`}
           onMouseLeave={() => onHighlight(null)}
+          onKeyDown={onKeyDown}
           sx={{ listStyle: "none", m: 0, mt: 0.5, p: 0, border: 1, borderColor: "divider", borderRadius: 2 }}
         >
           {route.checkpoints.map((checkpoint, i) => {
@@ -48,9 +71,12 @@ export function CheckpointList({ route, onHighlight }: CheckpointListProps) {
               <Box
                 component="li"
                 key={checkpoint.mile}
-                tabIndex={0}
+                tabIndex={i === current ? 0 : -1}
                 onMouseEnter={() => onHighlight(i)}
-                onFocus={() => onHighlight(i)}
+                onFocus={() => {
+                  setActive(i);
+                  onHighlight(i);
+                }}
                 onBlur={() => onHighlight(null)}
                 sx={{
                   px: 1.5,
@@ -94,4 +120,4 @@ export function CheckpointList({ route, onHighlight }: CheckpointListProps) {
       </Collapse>
     </Box>
   );
-}
+});

@@ -9,6 +9,7 @@ import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import { memo } from "react";
 
 import type { PlanResponse } from "../api/client";
 import type { components } from "../api/schema";
@@ -21,7 +22,7 @@ type RouteId = components["schemas"]["IdEnum"];
 const MILES_LABELS = [...LEVEL_NAMES, "Unknown"];
 
 /** The recommendation and why, with the one warning that changes what a dispatcher does. */
-export function Recommendation({ plan }: { plan: PlanResponse }) {
+export const Recommendation = memo(function Recommendation({ plan }: { plan: PlanResponse }) {
   const { recommendation } = plan;
   return (
     <Stack spacing={1.5} role="status">
@@ -47,7 +48,7 @@ export function Recommendation({ plan }: { plan: PlanResponse }) {
       </Box>
     </Stack>
   );
-}
+});
 
 /** Miles at each level as one bar, so the routes compare at a glance. */
 function LevelBar({ route }: { route: Route }) {
@@ -99,6 +100,34 @@ function LevelBar({ route }: { route: Route }) {
   );
 }
 
+const VISUALLY_HIDDEN = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+} as const;
+
+/** The card in one sentence, for screen readers, which read a button's content as its name only. */
+function describe(route: Route, recommended: boolean): string {
+  const { summary } = route;
+  const miles = MILES_KEYS.map((key, i) => [MILES_LABELS[i], summary.miles_by_level[key]] as const)
+    .filter(([, mi]) => mi > 0)
+    .map(([label, mi]) => `${label} ${formatMiles(mi)}`)
+    .join(", ");
+  const mean = summary.mean_level === null ? "unknown" : summary.mean_level.toFixed(2);
+  return [
+    recommended ? "Recommended." : "",
+    route.fallback ? "Fallback route." : "",
+    `${formatDuration(summary.duration_min)}, ${formatMiles(summary.distance_mi)}.`,
+    `${miles}.`,
+    `Mean level ${mean} of 4, ${route.checkpoints.length} checkpoints.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 interface RouteCardProps {
   route: Route;
   rank: number;
@@ -109,11 +138,16 @@ interface RouteCardProps {
 
 function RouteCard({ route, rank, recommended, selected, onSelect }: RouteCardProps) {
   const { summary } = route;
+  const detailsId = `route-${route.id}-details`;
   return (
+    // A div with the button role, so the card's headings and blocks are valid inside it; the
+    // name stays short and the summary is read as its description.
     <ButtonBase
+      component="div"
       onClick={onSelect}
       aria-pressed={selected}
       aria-label={`Route ${route.id}, ranked ${rank}`}
+      aria-describedby={detailsId}
       sx={{
         display: "block",
         width: "100%",
@@ -147,12 +181,14 @@ function RouteCard({ route, rank, recommended, selected, onSelect }: RouteCardPr
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Route {route.id}
         </Typography>
-        {recommended ? <Chip label="Best" size="small" color="success" sx={{ height: 20 }} /> : null}
+        {recommended ? (
+          <Chip label="Recommended" size="small" color="success" sx={{ height: 20 }} />
+        ) : null}
         {route.fallback ? (
-          <Tooltip title="Found by sending the router through a point off the direct line, to offer a third distinct route.">
+          <Tooltip title="A fallback route: found by sending the router through a point off the direct line, to offer a third distinct route.">
             <Chip
               icon={<AltRoute />}
-              label="Detour"
+              label="Fallback"
               size="small"
               variant="outlined"
               sx={{ height: 20 }}
@@ -186,6 +222,9 @@ function RouteCard({ route, rank, recommended, selected, onSelect }: RouteCardPr
           {route.checkpoints.length} checkpoints
         </Typography>
       </Stack>
+      <Box component="span" id={detailsId} sx={VISUALLY_HIDDEN}>
+        {describe(route, recommended)}
+      </Box>
     </ButtonBase>
   );
 }
@@ -197,7 +236,7 @@ interface RouteCardsProps {
 }
 
 /** The routes in ranked order; choosing one selects it on the map too (ui D7). */
-export function RouteCards({ plan, selectedId, onSelect }: RouteCardsProps) {
+export const RouteCards = memo(function RouteCards({ plan, selectedId, onSelect }: RouteCardsProps) {
   const byId = new Map(plan.routes.map((route) => [route.id, route]));
   return (
     <Stack spacing={1.25} component="section" aria-label="Routes, best first">
@@ -216,4 +255,4 @@ export function RouteCards({ plan, selectedId, onSelect }: RouteCardsProps) {
       })}
     </Stack>
   );
-}
+});

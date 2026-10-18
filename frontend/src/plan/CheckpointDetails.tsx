@@ -36,13 +36,19 @@ export function LevelChip({ level }: { level: number | null }) {
   );
 }
 
-const DRIVER_NAMES = { wind: "wind", rain: "rain", snow: "snow" } as const;
+/** A driver condition with its reading, as CONTEXT.md writes it: "snow 2.40 in/hr". */
+function driverReading(driver: Checkpoint["drivers"][number], readings: Checkpoint["readings"]) {
+  if (driver === "wind") return `wind ${formatReading(readings.wind_mph, 1, "mph")}`;
+  if (driver === "rain") return `rain ${formatReading(readings.rain_in_hr, 2, "in/hr")}`;
+  return `snow ${formatReading(readings.snow_in_hr, 2, "in/hr")}`;
+}
 
 /** Why a checkpoint has its level, in a sentence. */
 export function levelReason(checkpoint: Checkpoint): string {
   if (checkpoint.level === null) return "No full forecast at this ETA.";
   if (checkpoint.drivers.length === 0) return "";
-  return `Set by ${checkpoint.drivers.map((d) => DRIVER_NAMES[d]).join(" and ")}.`;
+  const drivers = checkpoint.drivers.map((d) => driverReading(d, checkpoint.readings));
+  return `Set by ${drivers.join(" and ")}.`;
 }
 
 /** Everything the API says about one checkpoint (spec: ETA, values, level, driver). */

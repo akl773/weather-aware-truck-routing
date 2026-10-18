@@ -5,7 +5,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import type { PlanRequest } from "../api/client";
-import { formatTime } from "../format";
+import { formatTime, zoneName } from "../format";
 
 /** The planned trip in one glance, with the way back to the form. */
 export function TripSummary({ request, onEdit }: { request: PlanRequest; onEdit: () => void }) {
@@ -17,7 +17,8 @@ export function TripSummary({ request, onEdit }: { request: PlanRequest; onEdit:
           {short(request.origin.label)} → {short(request.destination.label)}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Leaves {formatTime(request.departure)} · {request.load_lb.toLocaleString("en-US")} lb ·
+          Leaves {formatTime(request.departure)} {zoneName(new Date(request.departure))} ·{" "}
+          {request.load_lb.toLocaleString("en-US")} lb ·
           every {request.interval_mi} mi
         </Typography>
       </Box>

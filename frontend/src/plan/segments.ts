@@ -53,5 +53,7 @@ export function routeSegments(route: Route): Segment[] {
 
 /** Where along the path a mile falls, for markers and labels. */
 export function pointAtMile(route: Route, mile: number): LngLat {
+  const [first] = route.path;
+  if (route.path.length < 2) return [first?.[0] ?? 0, first?.[1] ?? 0];
   return pointAt(route.path, mile, 1).point;
 }
