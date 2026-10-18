@@ -97,3 +97,38 @@ Rejected: a binary or base64 typed-array payload, because at about 30 KB gzipped
 already small, and the browser would need a decoder and a schema of its own.
 Enforced by: `trips.serializers.corridor_response`; `test_corridor_returns_a_level_per_cell_per_frame`,
 `test_corridor_numbers_are_the_numbers_shown`.
+
+### D5. The heatmap is fetched once after the plan and drawn under the routes
+The browser asks for the corridor as soon as a plan arrives, with that plan's paths, departure and
+load, and caches it per plan like the plan itself (ui D5): never retried on its own and never
+refetched on focus or reconnect. The routes and cards show at once and the heatmap fades in when it
+lands; if it fails, the timeline says so and offers a retry while the routes stay usable. Cells are
+drawn as squares one cell size wide, under the routes and checkpoints, translucent enough that the
+basemap's towns and roads stay readable.
+Rejected: fetching the corridor in parallel with the plan, because its input is the plan's paths.
+Enforced by: `frontend/src/corridor/useCorridor.ts`, `frontend/src/corridor/heatmapLayers.ts`.
+
+### D6. Risk is the default view; wind, rain and snow are continuous ramps, not levels
+The default view colours each cell by its level for the trip's load, in the same colours as the
+routes (ui D6), so the heatmap and the cards say the same thing. Low is the faintest, so the eye
+goes to the weather that matters. The wind, rain and snow views colour each cell by that reading on
+a continuous ramp of its own hue that reaches full strength at the reading's No Travel threshold,
+with a legend in the reading's unit. They never use level colours, so a raw view is not mistaken
+for risk, and they need no copy of the classification rules in the browser (D2).
+Rejected: classifying single readings in the browser to colour the raw views by band, because it
+would duplicate the graded rules D2 keeps on the server.
+Enforced by: `frontend/src/corridor/colors.ts`; `colors.test.ts`.
+
+### D7. Scrubbing is local: colours are precomputed per frame and blended between hours
+When the corridor arrives, each view's colours are computed once for every frame, as one flat byte
+array per frame. Moving the slider only blends the two frames either side of the slider's hour into
+a reused array and hands it to the cell layer as a new colour attribute; nothing is fetched, parsed
+or tessellated again. The slider moves in quarter hours (Page Up and Page Down jump three hours) and
+Play runs the 48 hours in 16 seconds, so the weather visibly drifts between the hourly frames
+instead of jumping. Each route's truck is drawn where its ETAs put it at the slider's hour,
+interpolated between checkpoints, and waits at the destination once it has arrived.
+Rejected: one deck.gl layer per frame toggled by visibility, because 49 layers of the same geometry
+cost 49 times the GPU memory and cannot show the time between frames.
+Enforced by: `frontend/src/corridor/colors.ts` (`frameColors`, `blendFrames`),
+`frontend/src/corridor/truck.ts`, `frontend/src/corridor/Timeline.tsx`; `colors.test.ts`,
+`truck.test.ts`.
