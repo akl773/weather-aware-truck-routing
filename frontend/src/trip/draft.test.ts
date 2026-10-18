@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   type TripDraft,
@@ -17,13 +17,8 @@ const SALT_LAKE_CITY = { label: "Salt Lake City, UT, USA", lat: 40.7608, lon: -1
 // One mile of latitude in degrees, on the API's haversine earth.
 const MILE_DEG = (1 / 3958.8) * (180 / Math.PI);
 
-// Local time is read in the zone the tests run in; pin it so offsets are predictable.
-const ORIGINAL_TZ = process.env.TZ;
-beforeEach(() => {
-  process.env.TZ = "America/Denver";
-});
+// Local time is read in the browser's zone, America/Denver in every test (vite.config.ts).
 afterEach(() => {
-  process.env.TZ = ORIGINAL_TZ;
   vi.useRealTimers();
 });
 
