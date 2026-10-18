@@ -21,7 +21,8 @@ from providers.routing import Route
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://api.stadiamaps.com"
-TIMEOUT_S = 20.0
+# Per request. A plan makes up to five route requests, inside its fallback budget (routing D4).
+TIMEOUT = httpx.Timeout(10.0, connect=3.0)
 ROUTE_TTL_S = 6 * 3600
 PLACES_TTL_S = 7 * 86400
 PLACES_COUNTRIES = "US,CA,MX"
@@ -55,11 +56,12 @@ def parse_trip(trip: dict[str, Any]) -> Route:
     """Join a Valhalla trip's legs into one `Route` with cumulative miles and seconds (D3).
 
     Each maneuver's length and time are spread over its shape points in proportion to their
-    great-circle length, so the last point carries exactly the provider's totals.
+    great-circle length, so the last point carries the sum of the maneuvers' lengths and times.
     """
     points: list[Point] = []
     cum_mi: list[float] = []
     cum_s: list[float] = []
+    rough = False
     for leg in trip["legs"]:
         shape = decode_polyline(leg["shape"])
         offset = len(points)
@@ -71,6 +73,7 @@ def parse_trip(trip: dict[str, Any]) -> Route:
             cum_s.append(0.0)
         points.extend(shape)
         for maneuver in leg["maneuvers"]:
+            rough = rough or bool(maneuver.get("rough"))
             start = offset + maneuver["begin_shape_index"]
             end = offset + maneuver["end_shape_index"]
             if end <= start:
@@ -86,7 +89,7 @@ def parse_trip(trip: dict[str, Any]) -> Route:
                 cum_s.append(base_s + maneuver["time"] * share)
     if len(cum_mi) != len(points):
         raise ProviderError("Routing provider returned maneuvers that do not cover the shape.")
-    return Route(tuple(points), tuple(cum_mi), tuple(cum_s))
+    return Route(tuple(points), tuple(cum_mi), tuple(cum_s), rough=rough)
 
 
 class StadiaMaps:
@@ -95,11 +98,14 @@ class StadiaMaps:
         self.api_key = api_key
 
     def routes(self, stops: Sequence[Point], load_lb: float, alternates: int) -> list[Route]:
-        locations = [
-            # Intermediate stops are pass-through: no stop, no U-turn (routing D4).
-            {"lat": p.lat, "lon": p.lon, "type": "break" if i in (0, len(stops) - 1) else "through"}
-            for i, p in enumerate(stops)
+        locations: list[dict[str, Any]] = [
+            {"lat": p.lat, "lon": p.lon, "type": "break"} for p in stops
         ]
+        for via in locations[1:-1]:
+            # Pass through without stopping or turning round, on a road a truck would choose
+            # anyway: secondary or better, never a forest track (routing D4).
+            via["type"] = "through"
+            via["search_filter"] = {"min_road_class": "secondary"}
         body: dict[str, Any] = {
             "locations": locations,
             "costing": "truck",
@@ -110,12 +116,15 @@ class StadiaMaps:
         if alternates:
             body["alternates"] = alternates
         data = fetch_cached(
-            request_key("stadia:route:v1", body),
+            request_key("stadia:route:v2", body),
             ROUTE_TTL_S,
             lambda: self._request("POST", "/route/v1", json=body),
         )
-        trips = [data["trip"], *(alt["trip"] for alt in data.get("alternates", []))]
-        return [parse_trip(trip) for trip in trips]
+        try:
+            trips = [data["trip"], *(alt["trip"] for alt in data.get("alternates", []))]
+            return [parse_trip(trip) for trip in trips]
+        except (KeyError, TypeError, IndexError, ValueError, AttributeError) as exc:
+            raise ProviderError("The routing provider returned an unreadable route.") from exc
 
     def autocomplete(self, text: str) -> list[Place]:
         params = {"text": text, "boundary.country": PLACES_COUNTRIES, "size": PLACES_LIMIT}
@@ -124,15 +133,18 @@ class StadiaMaps:
             PLACES_TTL_S,
             lambda: self._request("GET", "/geocoding/v1/autocomplete", params=params),
         )
-        return [
-            Place(
-                label=feature["properties"]["label"],
-                point=Point(
-                    feature["geometry"]["coordinates"][1], feature["geometry"]["coordinates"][0]
-                ),
-            )
-            for feature in data["features"]
-        ]
+        try:
+            return [
+                Place(
+                    label=feature["properties"]["label"],
+                    point=Point(
+                        feature["geometry"]["coordinates"][1], feature["geometry"]["coordinates"][0]
+                    ),
+                )
+                for feature in data["features"]
+            ]
+        except (KeyError, TypeError, IndexError, AttributeError) as exc:
+            raise ProviderError("The place search returned an unreadable answer.") from exc
 
     def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         params = {**kwargs.pop("params", {}), "api_key": self.api_key}
@@ -141,7 +153,10 @@ class StadiaMaps:
         except httpx.HTTPError as exc:
             raise ProviderError("The routing provider could not be reached.") from exc
         if response.is_success:
-            return response.json()
+            try:
+                return response.json()
+            except ValueError as exc:
+                raise ProviderError("The routing provider returned an unreadable answer.") from exc
         error_code = _error_code(response)
         if error_code in NO_ROUTE_ERRORS:
             raise NoRouteError(NO_ROUTE_ERRORS[error_code])
@@ -157,9 +172,10 @@ class StadiaMaps:
 
 def _error_code(response: httpx.Response) -> int | None:
     try:
-        return response.json().get("error_code")
+        body = response.json()
     except ValueError:
         return None
+    return body.get("error_code") if isinstance(body, dict) else None
 
 
 @functools.cache
@@ -167,4 +183,4 @@ def default() -> StadiaMaps:
     """The app's shared client. Tests replace this function to replay recorded responses."""
     if not settings.STADIA_API_KEY:
         raise ProviderError("Routing is not configured: STADIA_API_KEY is missing.")
-    return StadiaMaps(httpx.Client(base_url=BASE_URL, timeout=TIMEOUT_S), settings.STADIA_API_KEY)
+    return StadiaMaps(httpx.Client(base_url=BASE_URL, timeout=TIMEOUT), settings.STADIA_API_KEY)

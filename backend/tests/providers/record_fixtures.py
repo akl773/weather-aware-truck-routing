@@ -44,7 +44,7 @@ class RecordingTransport(httpx.BaseTransport):
 
 def record(name: str, run) -> None:
     transport = RecordingTransport()
-    client = httpx.Client(base_url=stadia.BASE_URL, timeout=stadia.TIMEOUT_S, transport=transport)
+    client = httpx.Client(base_url=stadia.BASE_URL, timeout=stadia.TIMEOUT, transport=transport)
     try:
         run(stadia.StadiaMaps(client, os.environ["STADIA_API_KEY"]))
     except NoRouteError as exc:
