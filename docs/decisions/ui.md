@@ -60,3 +60,27 @@ passed. The user retries with the button, which also fetches a fresh plan for an
 the cached one is ten minutes old.
 Rejected: a mutation, because it caches nothing and two clicks would plan twice.
 Enforced by: `frontend/src/plan/usePlan.ts`.
+
+### D6. Routes are drawn in their checkpoints' levels, and the selected route sits on top
+Each route is cut into pieces by the miles each checkpoint owns, the same stretches the summary
+counts (risk scoring), and each piece takes its checkpoint's level colour: green Low, yellow
+Moderate, orange High, red Severe, purple No Travel, grey Unknown. Neighbouring levels differ in
+lightness as well as hue, and every level is also written as a word in the cards, tooltip and list,
+so colour is never the only cue. The selected route is drawn last, wider, at full opacity and on a white casing;
+the others stay visible at about half opacity for comparison. A letter at each route's midpoint names it,
+and the trip ends are drawn as a hollow start and a solid finish.
+Rejected: one colour per route, because the map would then show which route is which but not where
+the weather bites, which is the question the dispatcher has.
+Enforced by: `frontend/src/plan/segments.ts`, `frontend/src/map/planLayers.ts`,
+`frontend/src/risk/levels.ts`; `segments.test.ts`.
+
+### D7. The cards, the map and the checkpoint list share one selection
+A new plan selects its recommended route. Choosing a route on its card or on the map selects it in
+both, and the checkpoint list below the cards shows that route's checkpoints. Hovering a checkpoint
+on the map shows its mile, ETA, level and readings; hovering or focusing a row in the list
+highlights the same checkpoint on the map, so the list is the keyboard way to the same detail. Once
+a plan arrives the form collapses to a one-line summary and focus moves to the plan; "Edit" brings
+the form back with focus in its first field.
+Rejected: a separate detail panel per checkpoint, because it hides the map the detail is about.
+Enforced by: `frontend/src/App.tsx`, `frontend/src/plan/RouteCards.tsx`,
+`frontend/src/plan/CheckpointList.tsx`, `frontend/src/map/CheckpointTooltip.tsx`.
