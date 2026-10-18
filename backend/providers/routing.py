@@ -84,7 +84,8 @@ def plan_routes(
     started = clock()
     kept: list[Route] = []
     for route in router.routes([origin, destination], load_lb, alternates=TARGET_ROUTES - 1):
-        if is_distinct(route, kept):
+        # Two places can snap to the same road point; a route with no length goes nowhere.
+        if route.distance_mi > 0 and is_distinct(route, kept):
             kept.append(route)
     if not kept:
         raise NoRouteError("No truck route found between these places.")

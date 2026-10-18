@@ -38,10 +38,13 @@ Enforced by: `providers.stadia.gross_weight_tonnes`; `test_gross_weight_adds_the
 The adapter returns `Route(points, cum_miles, cum_s, …)`. Valhalla reports time and length per
 maneuver; the adapter spreads each maneuver's time and length over its shape points in proportion to
 their great-circle length, so the last point carries the sum of the maneuvers (within 0.1 mile and
-1 second of the provider's trip summary, which rounds differently). Checkpoint ETAs (#8) then read the time at any mile without an average speed.
+1 second of the provider's trip summary, which rounds differently). Checkpoint ETAs (#8) then read
+the time at any mile without an average speed. A route with no length, which two nearby places can
+produce by snapping to the same road point, is dropped.
 Rejected: one average speed for the whole route, because a route's fast interstate stretch and
 slow mountain stretch would get the same pace, misplacing ETAs by hours on long trips.
-Enforced by: `providers.stadia.parse_trip`; `test_cumulative_values_end_at_the_provider_totals`.
+Enforced by: `providers.stadia.parse_trip`, `providers.routing.plan_routes`;
+`test_cumulative_values_end_at_the_provider_totals`, `test_a_route_with_no_length_is_dropped`.
 
 ### D4. Missing routes are filled by routing through an offset via point
 When the provider returns fewer than three routes and the ends are at least 20 miles apart, the app
