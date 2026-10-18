@@ -15,9 +15,11 @@ Out of scope: weather outside the corridor, forecast hours past 48, and animated
 Cells are squares on a global grid whose centres are multiples of the cell size in degrees. Sizes
 come from a fixed ladder, 0.15° (about 15 km, the size `CONTEXT.md` aims for) up to 1.0°, and the
 corridor uses the finest one with at most 250 cells. A cell belongs to the corridor if its centre
-is within 25 miles (40 km) of a route, or within half its diagonal when that is larger, so every
-cell a route crosses is included. Routes are densified before the test, because a simplified path
-can leave tens of miles between points on a straight interstate.
+is within 25 miles (40 km) of a route, or within half its diagonal plus a mile when that is larger,
+so every cell a route crosses is included. Routes are densified to a point every 2 miles before the
+test (the extra mile covers the gap between those points), because a simplified path can leave tens
+of miles between points on a straight interstate. Centres past a pole are never made, and
+longitudes wrap into [-180, 180), the range the weather provider takes.
 Each cell is one weather location (weather D4), and the free tier allows 600 a minute and 5,000 an
 hour. A 15 km grid needs 758 cells for Denver to Salt Lake City and about 3,800 for New York to Los
 Angeles, which is more than a minute's budget for a single trip. Capped at 250, a cross-country plan
@@ -39,6 +41,7 @@ Rejected: one weather location per several cells, interpolated, because it inven
 forecast does not have and the cells would no longer match a checkpoint's reading.
 A route set too large even at 1.0° is refused as invalid input.
 Enforced by: `trips.corridor.corridor_cells`; `test_cells_cover_every_route_point`,
+`test_cells_near_the_180th_meridian_wrap_into_range`, `test_no_cell_lies_past_a_pole`,
 `test_a_cell_centre_24_9_miles_from_a_route_is_in_the_corridor`,
 `test_a_cell_centre_25_1_miles_from_a_route_is_not`, `test_cell_size_grows_until_the_corridor_fits`,
 `test_cell_centres_sit_on_the_weather_lattice`,
@@ -52,17 +55,23 @@ level is the level a checkpoint there would get at that hour.
 Rejected: sending raw values and classifying in the browser, because the graded rules would then
 exist twice, in two languages, and a load change already needs a new plan: load is a routing input
 (routing D2).
-Enforced by: `trips.corridor.corridor_frames`; `test_a_cell_level_matches_a_checkpoint_there`,
-`test_frames_run_from_departure_to_48_hours`, `test_frame_levels_apply_the_load_rules`.
+Enforced by: `trips.corridor.corridor_frames`; `test_a_cell_matches_a_plan_checkpoint_at_its_centre`,
+`test_cell_readings_follow_the_checkpoint_rules`, `test_frames_run_from_departure_to_48_hours`,
+`test_frame_levels_apply_the_load_rules`, `test_a_cell_without_a_full_forecast_is_unknown`.
 
 ### D3. `POST /api/corridor` takes the plan's paths, departure and load, and keeps no state
 The browser already holds the plan's simplified paths (plan-api D4), so it sends them back with the
-departure and load. Up to three paths of up to 5,000 points each are accepted; the departure has
-the same bounds as a plan's (plan-api D1). The weather window is the one a plan for the same
-departure would fetch when its last ETA is within the 48 hours (weather D5), so most heatmaps reuse
-locations the plan's neighbours already cached.
+departure and load. The departure has the same bounds as a plan's (plan-api D1). Up to three paths
+are accepted, each of up to 10,000 points (a simplified Seattle to Miami route has about 2,900) and
+up to 8,000 miles (Key West to Prudhoe Bay is about 5,800). The length cap bounds the work, which
+grows with the miles to densify: the worst input it allows, three 8,000-mile zigzags, takes 0.3 s,
+where an unbounded path could take minutes and gigabytes. A path that jumps across the 180th
+meridian is refused, because no route here does and it would be drawn the long way round. The
+weather window is the one a plan for the same departure would fetch when its last ETA is within the
+48 hours (weather D5), so most heatmaps reuse locations the plan's neighbours already cached.
 Rejected: storing each plan under an id for the heatmap to reference, because it adds storage and
-an expiry to a service that has none, to save sending about 50 KB.
+an expiry to a service that has none, to save an upload of 50 KB for a medium trip and about
+350 KB coast to coast.
 Rejected: returning the frames inside the plan response, because the routes and cards would then
 wait for 250 more weather locations before showing anything.
 Enforced by: `trips.serializers.CorridorRequestSerializer`, `PathField`; `test_corridor_rejects_*`,
