@@ -11,7 +11,15 @@ describe("formatting (ui D3, recommendation D4)", () => {
   it("writes durations in hours and minutes", () => {
     expect(formatDuration(443)).toBe("7 h 23 min");
     expect(formatDuration(45)).toBe("45 min");
-    expect(formatDuration(120)).toBe("2 h 0 min");
+  });
+
+  it("drops a zero minute part", () => {
+    expect(formatDuration(120)).toBe("2 h");
+  });
+
+  it("rounds before splitting, so the minutes never read 60", () => {
+    expect(formatDuration(119.7)).toBe("2 h");
+    expect(formatDuration(59.6)).toBe("1 h");
   });
 
   it("pads miles the API rounded without rounding them again", () => {

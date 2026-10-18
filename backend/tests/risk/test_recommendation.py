@@ -133,6 +133,12 @@ def test_reason_formats_duration_in_hours_and_minutes():
     )
 
 
+def test_reason_drops_a_zero_minute_part():
+    result = recommend([route("a", minutes=120), route("b", minutes=45)])
+
+    assert result.reason == "Fastest at equal risk: 45 min vs 2 h on the next best route."
+
+
 def test_reason_for_a_single_route():
     result = recommend([route("only")])
 

@@ -58,11 +58,17 @@ Enforced by: `backend/config/settings.py`, `backend/.env.example`.
 - pytest table tests for every band edge and load rule, and ranking tests (`risk-classification.md`,
   `recommendation.md`).
 - API and adapter tests on recorded provider fixtures. Tests never touch the network.
-- vitest for frontend logic: frame indexing, client-side classification, colour mapping.
-- One Playwright end-to-end test: plan a trip and scrub the slider (#16).
+- vitest for frontend logic: trip validation, route segments, frame blending, colour mapping and
+  truck positions. The browser never classifies risk (corridor-heatmap D2).
+- One Playwright end-to-end test in Chromium: plan a trip, compare the three routes and scrub the
+  slider, checking that scrubbing makes no request (#16). The browser's API calls are answered from
+  responses recorded off our own API, and the basemap is a blank style, so the test needs no keys,
+  fetches no tiles and runs the same in CI as on a laptop. The backend's own tests cover how those
+  answers are made.
 Coverage is reported but has no target percentage. A number target rewards testing trivial code.
 Rejected: backend-only tests, because half the grade is the UI.
-Enforced by: `backend/pyproject.toml` (`[tool.pytest.ini_options]`), CI (#4).
+Enforced by: `backend/pyproject.toml` (`[tool.pytest.ini_options]`), CI (#4),
+`frontend/e2e/plan-and-scrub.spec.ts`.
 
 ## Frontend
 

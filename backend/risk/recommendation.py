@@ -97,8 +97,11 @@ def _explain(
 
 def _format(key: RankingKey, value: float) -> str:
     if key is RankingKey.DURATION:
-        hours, minutes = divmod(int(value), 60)
-        return f"{hours} h {minutes} min" if hours else f"{minutes} min"
+        hours, minutes = divmod(round(value), 60)
+        if not hours:
+            return f"{minutes} min"
+        # The same words as the cards beside the reason, which drop a zero minute part.
+        return f"{hours} h {minutes} min" if minutes else f"{hours} h"
     if key is RankingKey.MEAN_LEVEL:
         return f"{value:.2f}"
     return f"{value:.1f}"
