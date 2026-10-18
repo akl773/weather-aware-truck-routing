@@ -17,13 +17,13 @@ export function App() {
 
   return (
     <Box sx={{ position: "fixed", inset: 0 }}>
-      <MapView />
       <Panel>
         <Header />
         <TripForm
           onSubmit={(next) => {
-            // Asking again for a plan that failed retries it; the query would not refetch on its own.
-            if (JSON.stringify(next) === JSON.stringify(request) && plan.isError) plan.refetch();
+            // Asking again for a plan that failed or has gone stale fetches it; the query would not.
+            const same = JSON.stringify(next) === JSON.stringify(request);
+            if (same && (plan.isError || plan.isStale)) plan.refetch();
             setRequest(next);
           }}
           pending={plan.isFetching}
@@ -36,6 +36,8 @@ export function App() {
           </Typography>
         ) : null}
       </Panel>
+      {/* After the panel, so keyboard users reach the form before the map. */}
+      <MapView />
       <Typography
         component="footer"
         variant="caption"

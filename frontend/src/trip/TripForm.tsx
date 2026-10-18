@@ -13,6 +13,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { type FormEvent, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import type { PlanRequest } from "../api/client";
 import { zoneName } from "../format";
@@ -25,6 +26,7 @@ import {
   type TripDraft,
   type TripField,
   defaultDraft,
+  parseLocalInput,
   toLocalInput,
   validateTrip,
 } from "./draft";
@@ -46,11 +48,15 @@ export function TripForm({ onSubmit, pending, error }: TripFormProps) {
   const now = new Date();
   const { errors } = validateTrip(draft, now);
   const shown = attempted ? errors : {};
+  // The zone in force at the departure, which differs from now's across a clock change.
+  const zone = zoneName(parseLocalInput(draft.departure) ?? now);
   const update = (changes: Partial<TripDraft>) => setDraft((d) => ({ ...d, ...changes }));
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    setAttempted(true);
+    if (pending) return;
+    // Errors render before focus moves, so a screen reader announces the field with its error.
+    flushSync(() => setAttempted(true));
     const result = validateTrip(draft, new Date());
     if (result.request) {
       onSubmit(result.request);
@@ -110,7 +116,7 @@ export function TripForm({ onSubmit, pending, error }: TripFormProps) {
             value={draft.departure}
             onChange={(e) => update({ departure: e.target.value })}
             error={Boolean(shown.departure)}
-            helperText={shown.departure ?? `Times in ${zoneName(now)}`}
+            helperText={shown.departure ?? `Times in ${zone}`}
             inputRef={departureRef}
             sx={{ flex: 1.4 }}
             slotProps={{
@@ -127,7 +133,7 @@ export function TripForm({ onSubmit, pending, error }: TripFormProps) {
             onChange={(e) => update({ loadLb: e.target.value })}
             error={Boolean(shown.loadLb)}
             helperText={shown.loadLb ?? "0 to 80,000"}
-            placeholder="30,000"
+            placeholder="e.g. 30,000"
             inputRef={loadRef}
             sx={{ flex: 1 }}
             slotProps={{
@@ -167,7 +173,8 @@ export function TripForm({ onSubmit, pending, error }: TripFormProps) {
           type="submit"
           variant="contained"
           size="large"
-          disabled={pending}
+          // Stays focusable while planning, so keyboard focus is not dropped to the page.
+          aria-disabled={pending}
           startIcon={pending ? <CircularProgress size={18} color="inherit" /> : null}
         >
           {pending ? "Planning routes…" : "Plan routes"}
