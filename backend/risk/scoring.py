@@ -1,5 +1,6 @@
 """Owned miles and route summaries. See docs/decisions/recommendation.md."""
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
@@ -14,6 +15,8 @@ def display_round(value: float, places: int, *, up: bool = False) -> float:
     `round()` rounds 12.25 to 12.2 and JavaScript's `toFixed` gives 12.3; this gives 12.3, and the
     UI prints the result as is. `up=True` rounds any remainder up instead (No Travel miles, D3).
     """
+    if not math.isfinite(value):
+        raise ValueError(f"only finite values can be displayed, got {value!r}")
     mode = ROUND_CEILING if up else ROUND_HALF_UP
     return float(Decimal(repr(value)).quantize(Decimal(1).scaleb(-places), mode))
 
@@ -32,10 +35,13 @@ def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[f
     """
     if not checkpoint_miles:
         raise ValueError("a route needs at least one checkpoint")
+    if not all(math.isfinite(mile) for mile in [*checkpoint_miles, route_miles]):
+        raise ValueError("checkpoint miles and route length must be finite")
     if route_miles <= 0:
         raise ValueError("route length must be positive")
-    if any(later < earlier for earlier, later in pairwise(checkpoint_miles)):
-        raise ValueError("checkpoints must be in order along the route")
+    # D1: a duplicate would own zero miles and its level would vanish from the summary.
+    if any(later <= earlier for earlier, later in pairwise(checkpoint_miles)):
+        raise ValueError("checkpoint miles must be strictly increasing along the route")
     if checkpoint_miles[0] < 0 or checkpoint_miles[-1] > route_miles:
         raise ValueError("checkpoints must lie within the route")
 
@@ -62,6 +68,8 @@ def summarize_route(
     duration_s: float,
     checkpoints: Sequence[CheckpointLevel],
 ) -> RouteSummary:
+    if not math.isfinite(duration_s) or duration_s < 0:
+        raise ValueError(f"duration must be finite and non-negative, got {duration_s!r}")
     owned = owned_miles([checkpoint.mile for checkpoint in checkpoints], distance_miles)
     miles_by_level = [0.0] * len(Level)
     for checkpoint, miles in zip(checkpoints, owned, strict=True):

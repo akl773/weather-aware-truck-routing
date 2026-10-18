@@ -4,7 +4,7 @@ import random
 import pytest
 
 from risk.levels import Level
-from risk.scoring import CheckpointLevel, owned_miles, summarize_route
+from risk.scoring import CheckpointLevel, display_round, owned_miles, summarize_route
 
 L, M, H, S, N = Level.LOW, Level.MODERATE, Level.HIGH, Level.SEVERE, Level.NO_TRAVEL
 
@@ -36,7 +36,11 @@ def test_owned_miles_sum_to_the_route_length():
     [
         ([], 10, "at least one checkpoint"),
         ([0, 5], 0, "route length must be positive"),
-        ([5, 2], 10, "in order along the route"),
+        ([5, 2], 10, "strictly increasing"),
+        ([0, 10, 10], 10, "strictly increasing"),
+        ([math.nan, 5], 10, "finite"),
+        ([0, 5], math.nan, "finite"),
+        ([0, 5], math.inf, "finite"),
         ([0, 11], 10, "within the route"),
         ([-1, 5], 10, "within the route"),
     ],
@@ -76,3 +80,15 @@ def test_miles_at_every_level_sum_to_the_distance():
     )
 
     assert sum(summary.miles_at(level) for level in Level) == 60
+
+
+@pytest.mark.parametrize("duration_s", [-1, math.nan, math.inf])
+def test_summarize_route_rejects_impossible_durations(duration_s):
+    with pytest.raises(ValueError, match="duration"):
+        summarize_route("a", 10, duration_s, [CheckpointLevel(0, L)])
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_display_round_rejects_non_finite_values(value):
+    with pytest.raises(ValueError, match="finite"):
+        display_round(value, 1)
