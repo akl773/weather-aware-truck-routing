@@ -27,7 +27,9 @@ and convective systems. Snow in/hr is `snowfall`, inches of fresh snow, which is
 0.5 to 3.0 in/hr bands describe.
 Rejected: `precipitation`, because it adds snow's water equivalent to rain and would count a
 snowstorm twice.
-Enforced by: `providers.open_meteo.parse_location`; `test_rain_adds_showers`.
+A value the provider leaves empty or sends as a non-number stays unknown.
+Enforced by: `providers.open_meteo.parse_location`; `test_rain_adds_showers`,
+`test_a_non_finite_value_is_missing_not_a_reading`.
 
 ### D3. Hourly totals are valid at the middle of their hour
 Open-Meteo's rain, showers, snowfall and gusts at hour T are the sum or maximum over the hour
@@ -40,7 +42,9 @@ Enforced by: `providers.open_meteo.Series.period_times`; `test_hourly_totals_sit
 Open-Meteo counts each location as one call (free tier: 600 a minute, 5,000 an hour, 10,000 a
 day). Snapping to 0.05° (about 5 km, close to HRRR's 3 km grid) lets nearby
 checkpoints on overlapping routes, and the corridor heatmap, share one location. Batches of 100
-keep each request under a few seconds.
+keep each request under a few seconds. A cross-country plan at 10-mile spacing needs about 900
+locations, more than the per-minute limit allows; the provider's refusal reaches the user as "try
+again shortly", and the 25-mile default (about 360) stays inside it.
 Rejected: one request per point, because a 350-checkpoint plan would take minutes.
 Rejected: a coarser 0.25° lattice, because it averages away the HRRR detail.
 Enforced by: `providers.open_meteo.snap`, `BATCH_SIZE`; `test_nearby_points_share_one_location`,
