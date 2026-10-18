@@ -22,4 +22,6 @@ COPY --from=build --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 GIT_SHA=$GIT_SHA
 USER app
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]
+# A plan waits on routing and weather providers; the timeout sits just under nginx's 65 s.
+CMD ["gunicorn", "config.wsgi", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", \
+     "--access-logfile", "-"]
