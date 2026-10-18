@@ -43,3 +43,29 @@ it.
   (past the forecast horizon) is handled before classification, in the weather layer.
 - `backend/tests/risk/test_purity.py` fails the build if `risk/` imports anything outside a small
   standard-library allowlist. Keep it pure; pass values in as arguments.
+
+## Scoring and ranking
+
+Decided in `docs/decisions/recommendation.md` (D1–D6).
+
+| Rule | Code | Decision |
+|---|---|---|
+| Owned miles (centred stretches, sum to route length) | `risk.scoring.owned_miles` | D1 |
+| Miles at level, owned-mile-weighted mean level | `risk.scoring.summarize_route` | D2 |
+| Ranking order, No Travel first (rounded up) | `risk.recommendation.ranking_values` | D3 |
+| Compare at display precision, half up | `risk.scoring.display_round` | D4 |
+| All routes cross No Travel | `recommend` (`all_routes_cross_no_travel`) | D5 |
+| Reason text | `risk.recommendation._explain` | D6 |
+
+Traps:
+
+- **Never compare raw miles or mean level.** Go through `ranking_values`; a 0.0001 mi difference
+  must not decide the recommendation.
+- **No Travel miles round up** (`display_round(..., up=True)`), so 0.04 mi shows and ranks as 0.1.
+- **The UI pads, it never rounds to a new value.** The API sends `display_round` values;
+  `toFixed(1)` on 3 gives "3.0", which is fine. Python's `round` and JavaScript's `toFixed`
+  disagree on halves, so rounding a raw value in the UI would break D4.
+- **Checkpoint miles are strictly increasing.** `owned_miles` rejects duplicates, because a
+  duplicate would own zero miles and its level would disappear.
+- **Ties keep the provider's order** because `sorted` is stable. Do not add a tie-breaker that is not
+  in the decision record.
