@@ -15,7 +15,7 @@ Decisions: `docs/decisions/routing.md` (D1–D8) and `weather.md` (D1–D6). Rea
 | `providers/routing.py` | `Route` (points, cumulative miles and seconds), `Router` protocol, `plan_routes` |
 | `providers/stadia.py` | Valhalla request/response, weight conversion, error mapping, `default()` client |
 | `providers/open_meteo.py` | hourly `Series` per 0.05° lattice point, batched, fetch window, units |
-| `providers/cache.py` | `fetch_cached`: raw responses in Redis, fail-open |
+| `providers/cache.py` | `fetch_cached`, `fetch_many_cached` (per item, cached batch by batch): raw responses in Redis, fail-open |
 | `providers/errors.py` | `ProviderError` (502) and `NoRouteError` (422), mapped in `trips/errors.py` |
 
 Provider field names, units and error codes never leave the adapter module. If a view or `risk/`

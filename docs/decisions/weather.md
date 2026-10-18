@@ -42,27 +42,42 @@ Enforced by: `providers.open_meteo.Series.period_times`; `test_hourly_totals_sit
 Open-Meteo counts each location as one call (free tier: 600 a minute, 5,000 an hour, 10,000 a
 day). Snapping to 0.05° (about 5 km, close to HRRR's 3 km grid) lets nearby
 checkpoints on overlapping routes, and the corridor heatmap, share one location. Batches of 100
-keep each request under a few seconds. A cross-country plan at 10-mile spacing needs about 900
-locations, more than the per-minute limit allows; the provider's refusal reaches the user as "try
-again shortly", and the 25-mile default (about 360) stays inside it.
+keep each request under a few seconds, and each batch is cached as soon as it returns. A
+cross-country plan at 10-mile spacing needs about 900 locations, more than the per-minute limit
+allows: the provider refuses part-way, the user sees "try again shortly", and the retry a minute
+later asks only for the batches that failed. The 25-mile default (about 360) stays inside the
+limit. The hourly and daily budgets are shared by every user of the server, about 13 uncached
+cross-country plans an hour at the default spacing; the cache is what keeps a demo inside them.
+Callers get one series per point they asked about; the lattice stays inside the adapter.
 Rejected: one request per point, because a 350-checkpoint plan would take minutes.
+Rejected: caching only after every batch succeeds, because a plan over the per-minute limit would
+then spend the same calls on every retry and never finish.
 Rejected: a coarser 0.25° lattice, because it averages away the HRRR detail.
-Enforced by: `providers.open_meteo.snap`, `BATCH_SIZE`; `test_nearby_points_share_one_location`,
-`test_large_requests_are_batched`.
+Enforced by: `providers.open_meteo.snap`, `BATCH_SIZE`, `providers.cache.fetch_many_cached`;
+`test_nearby_points_share_one_location`, `test_each_point_gets_the_answer_for_its_own_location`,
+`test_large_requests_are_batched`, `test_a_failed_batch_keeps_the_batches_before_it`.
 
 ### D5. Every fetch covers a whole-day window from the hour before departure
 The window starts one hour before departure and spans at least 50 hours, rounded up to whole days,
 so the plan (departure to last ETA) and the 48-hour heatmap request the same window and share the
-cache. The end is clamped to the provider's range (today plus 15 days); hours past it come back
-unknown.
+cache. Its last hourly total is valid 30 minutes before its last hour (D3), so the window reaches
+half an hour past the latest time it must cover. The end is clamped to the provider's range (today
+plus 15 days); hours past it come back unknown. Callers validate the departure first; a departure
+past the range is a programming error.
 Rejected: a window fitted to each request, because the plan and the heatmap would never share a
 cached response.
 Enforced by: `providers.open_meteo.fetch_window`; `test_window_is_shared_by_plan_and_heatmap`,
+`test_window_covers_a_last_eta_on_its_last_hourly_total`,
+`test_window_grows_when_a_last_eta_passes_its_last_hourly_total`,
 `test_window_is_clamped_to_the_provider_range`.
 
 ### D6. Each lattice point's window is cached for an hour, fail-open
 Cached per lattice point and window, so a second plan along the same corridor makes no weather
-call. One hour matches how often the underlying models refresh. Cache failures fall through to the
-provider (routing D7).
+call. The cache holds the provider's raw answer for the location and the adapter parses it on every
+read, as routing D7 does for routes, so a parsing change takes effect at once. One hour matches how
+often the underlying models refresh. Cache failures fall through to the provider (routing D7).
 Rejected: caching whole requests, because two plans rarely ask for exactly the same set of points.
-Enforced by: `providers.cache.fetch_many_cached`; `test_a_second_identical_fetch_makes_no_call`.
+Rejected: caching parsed `Series`, because a parsing fix would serve stale values for an hour and
+a new field would break on old entries.
+Enforced by: `providers.cache.fetch_many_cached`, `providers.open_meteo.OpenMeteo.hourly`;
+`test_a_second_identical_fetch_makes_no_call`.
