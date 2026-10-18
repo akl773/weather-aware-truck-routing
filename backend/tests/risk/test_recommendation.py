@@ -1,6 +1,5 @@
 import pytest
 
-from risk.levels import Level
 from risk.recommendation import RankingKey, recommend
 from risk.scoring import RouteSummary, display_round
 
@@ -43,7 +42,7 @@ def test_rank_puts_no_travel_before_everything_else():
 @pytest.mark.parametrize(
     ("winner", "loser", "deciding_key"),
     [
-        (route("w", severe=3), route("l", severe=9, high=0), RankingKey.SEVERE_MILES),
+        (route("w", severe=3), route("l", severe=9), RankingKey.SEVERE_MILES),
         (route("w", high=10), route("l", high=40), RankingKey.HIGH_MILES),
         (route("w", mean_level=0.4), route("l", mean_level=0.9), RankingKey.MEAN_LEVEL),
         (route("w", minutes=290), route("l", minutes=330), RankingKey.DURATION),
@@ -68,6 +67,19 @@ def test_display_round_rounds_halves_up():
     assert display_round(12.25, 1) == 12.3
     assert display_round(0.125, 2) == 0.13
     assert display_round(12.24, 1) == 12.2
+    # 2.675 is stored as 2.67499999...; rounding the decimal value keeps the half visible.
+    assert display_round(2.675, 2) == 2.68
+
+
+def test_display_tie_keeps_provider_order_even_when_raw_values_differ():
+    # Both show 3.2 Severe miles; the provider's first route is slightly worse underneath.
+    provider_first = route("provider-first", severe=3.24)
+    provider_second = route("provider-second", severe=3.21)
+
+    result = recommend([provider_first, provider_second])
+
+    assert [summary.route_id for summary in result.ranked] == ["provider-first", "provider-second"]
+    assert result.decided_by is None
 
 
 def test_differences_below_display_precision_tie():
@@ -137,11 +149,10 @@ def test_recommend_needs_at_least_one_route():
         recommend([])
 
 
-def test_levels_line_up_with_the_summary_tuple():
-    summary = route("a", no_travel=1, severe=2, high=3)
+def test_reason_drops_the_hours_for_trips_under_an_hour():
+    result = recommend([route("a", minutes=50), route("b", minutes=45)])
 
-    assert (summary.miles_at(Level.NO_TRAVEL), summary.miles_at(Level.SEVERE)) == (1, 2)
-    assert summary.miles_at(Level.HIGH) == 3
+    assert result.reason == "Fastest at equal risk: 45 min vs 50 min on the next best route."
 
 
 # recommendation D3: No Travel rounds up, so a sliver of it never ties with a clean route.

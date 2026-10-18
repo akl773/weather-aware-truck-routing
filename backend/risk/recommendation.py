@@ -16,16 +16,22 @@ class RankingKey(StrEnum):
     DURATION = "duration"
 
 
-def ranking_key(summary: RouteSummary) -> tuple[float, float, float, float, float]:
-    """D3 order, at the precision the route cards show (D4)."""
-    return (
+def ranking_values(summary: RouteSummary) -> dict[RankingKey, float]:
+    """Each ranking key at the precision the route cards show (D4)."""
+    return {
         # D3: rounded up, so a sliver of No Travel never ties with a clean route.
-        display_round(summary.miles_at(Level.NO_TRAVEL), 1, up=True),
-        display_round(summary.miles_at(Level.SEVERE), 1),
-        display_round(summary.miles_at(Level.HIGH), 1),
-        display_round(summary.mean_level, 2),
-        display_round(summary.duration_s / 60, 0),
-    )
+        RankingKey.NO_TRAVEL_MILES: display_round(summary.miles_at(Level.NO_TRAVEL), 1, up=True),
+        RankingKey.SEVERE_MILES: display_round(summary.miles_at(Level.SEVERE), 1),
+        RankingKey.HIGH_MILES: display_round(summary.miles_at(Level.HIGH), 1),
+        RankingKey.MEAN_LEVEL: display_round(summary.mean_level, 2),
+        RankingKey.DURATION: display_round(summary.duration_s / 60, 0),
+    }
+
+
+def ranking_key(summary: RouteSummary) -> tuple[float, ...]:
+    """Lexicographic in RankingKey's declaration order, which is the D3 order."""
+    values = ranking_values(summary)
+    return tuple(values[key] for key in RankingKey)
 
 
 @dataclass(frozen=True)
@@ -45,14 +51,14 @@ def recommend(summaries: Sequence[RouteSummary]) -> Recommendation:
         raise ValueError("a recommendation needs at least one route")
     # sorted() is stable, so routes tied on every key keep the provider's order (D4).
     ranked = tuple(sorted(summaries, key=ranking_key))
-    best = ranking_key(ranked[0])
-    decided_by, reason = _explain(best, ranking_key(ranked[1]) if len(ranked) > 1 else None)
+    best = ranking_values(ranked[0])
+    decided_by, reason = _explain(best, ranking_values(ranked[1]) if len(ranked) > 1 else None)
     return Recommendation(
         ranked=ranked,
         decided_by=decided_by,
         reason=reason,
         # D5: the top route crosses No Travel only if every route does.
-        all_routes_cross_no_travel=best[0] > 0,
+        all_routes_cross_no_travel=best[RankingKey.NO_TRAVEL_MILES] > 0,
     )
 
 
@@ -66,14 +72,14 @@ _REASONS = {
 
 
 def _explain(
-    best: tuple[float, ...], runner_up: tuple[float, ...] | None
+    best: dict[RankingKey, float], runner_up: dict[RankingKey, float] | None
 ) -> tuple[RankingKey | None, str]:
     """D6: name the first key that separated the top two routes, with both values."""
     if runner_up is None:
         return None, "Only one route was found."
-    for key, best_value, next_value in zip(RankingKey, best, runner_up, strict=True):
-        if best_value != next_value:
-            values = {"best": _format(key, best_value), "next": _format(key, next_value)}
+    for key in RankingKey:
+        if best[key] != runner_up[key]:
+            values = {"best": _format(key, best[key]), "next": _format(key, runner_up[key])}
             return key, _REASONS[key].format(**values) + " on the next best route."
     return None, (
         "Tied with the next best route on every measure; listed first by the routing provider."
@@ -83,7 +89,7 @@ def _explain(
 def _format(key: RankingKey, value: float) -> str:
     if key is RankingKey.DURATION:
         hours, minutes = divmod(int(value), 60)
-        return f"{hours} h {minutes} min"
+        return f"{hours} h {minutes} min" if hours else f"{minutes} min"
     if key is RankingKey.MEAN_LEVEL:
         return f"{value:.2f}"
     return f"{value:.1f}"
