@@ -49,6 +49,17 @@ export function MapStage({
   const hour = clock.plan === plan ? clock.hour : 0;
   const setHour = useCallback((next: number) => setClock({ plan, hour: next }), [plan]);
 
+  // How far the timeline reaches up from the bottom of the map, so a fit keeps the routes clear of it.
+  const [timelineInset, setTimelineInset] = useState<number | null>(null);
+  const measureTimeline = useCallback((node: HTMLElement | null) => {
+    if (!node) return;
+    const observer = new ResizeObserver(() =>
+      setTimelineInset(window.innerHeight - node.getBoundingClientRect().top),
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const bounds = useMemo(() => (plan ? planBounds(plan) : null), [plan]);
   const geometry = useMemo(
     () => (plan ? planGeometry(plan, selectedId) : null),
@@ -88,9 +99,18 @@ export function MapStage({
 
   return (
     <>
-      <MapView layers={layers} bounds={bounds} onHover={onHover} onMoveStart={onMoveStart} />
+      <MapView
+        layers={layers}
+        bounds={bounds}
+        bottomInset={timelineInset}
+        onHover={onHover}
+        onMoveStart={onMoveStart}
+      />
       {plan && request ? (
         <Timeline
+          // A refetched plan starts a new timeline, so Play does not run on against the old one.
+          key={planFetchedAt}
+          ref={measureTimeline}
           start={request.departure}
           hour={hour}
           onHour={setHour}
