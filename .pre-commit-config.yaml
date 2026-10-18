@@ -1,0 +1,18 @@
+# Install once: make hooks-install
+# Commit: gitleaks scans the staged diff for secrets (fast, blocks the commit).
+# Push: make check runs lint, format check and typecheck. Tests run in CI.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: make-check
+        name: make check
+        entry: make check
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
