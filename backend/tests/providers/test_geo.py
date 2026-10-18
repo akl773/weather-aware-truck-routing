@@ -3,6 +3,7 @@ import math
 import pytest
 
 from providers.geo import (
+    EARTH_RADIUS_MI,
     Point,
     cumulative_mi,
     decode_polyline,
@@ -75,6 +76,15 @@ def test_overlap_of_parallel_roads_10_miles_apart_is_zero():
     line = straight_line(100)
     parallel = [Point(p.lat + 10 / 69.0, p.lon) for p in line]
     assert overlap_share(line, parallel) == 0.0
+
+
+@pytest.mark.parametrize(("apart_mi", "share"), [(0.29, 1.0), (0.31, 0.0)])
+def test_roads_within_0_3_miles_count_as_the_same_road(apart_mi, share):
+    line = straight_line(20, step=0.5)
+    deg = apart_mi / (EARTH_RADIUS_MI * math.pi / 180)
+    parallel = [Point(p.lat + deg, p.lon) for p in line]
+    assert haversine_mi(line[0], parallel[0]) == pytest.approx(apart_mi)
+    assert overlap_share(line, parallel) == share
 
 
 def test_overlap_counts_only_the_shared_stretch():
