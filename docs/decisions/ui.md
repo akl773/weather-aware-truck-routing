@@ -14,7 +14,7 @@ Out of scope: accounts, saved trips, printing and native mobile apps.
 ### D1. One screen: the map, a floating panel, and a timeline
 The map fills the window. A panel floats on the left with the trip form, then the recommendation and
 the route cards; the timeline sits along the bottom once there is a plan. Nothing navigates away, so
-the map never reloads and the route a card describes is always visible beside it. Below 720 px wide
+the map never reloads and the route a card describes is always visible beside it. Below 900 px wide
 the panel spans the width at the top and scrolls on its own.
 Rejected: a form page that leads to a results page, because comparing routes needs the map and the
 cards side by side.
@@ -24,7 +24,7 @@ Enforced by: `frontend/src/App.tsx`, `frontend/src/layout/Panel.tsx`.
 The origin and destination fields search `/api/places` as the user types (two characters or more,
 after a 250 ms pause, up to the API's 100) and hold a place only once one is picked. Typing again
 clears the pick but keeps the text, so the coordinates sent always belong to the label shown (routing
-D6). Suggestions for text the user has since changed stay visible but cannot be picked, so Enter
+D6). Suggestions for text the user has since changed are hidden until fresh ones arrive, so Enter
 never takes a place that does not match what was typed. Suggestions are cached per query for five
 minutes.
 Rejected: geocoding free text on submit, because a typo would silently plan a trip to the wrong
@@ -67,18 +67,24 @@ counts (risk scoring), and each piece takes its checkpoint's level colour: green
 Moderate, orange High, red Severe, purple No Travel, grey Unknown. Neighbouring levels differ in
 lightness as well as hue, and every level is also written as a word in the cards, tooltip and list,
 so colour is never the only cue. The selected route is drawn last, wider, at full opacity and on a white casing;
-the others stay visible at about half opacity for comparison. A letter at each route's midpoint names it,
-and the trip ends are drawn as a hollow start and a solid finish.
+the others stay visible at about half opacity for comparison. Checkpoint dots are sized on the
+ground with a floor and a ceiling in pixels, so a 10-mile interval on a long route does not bead
+into a chain over the line when zoomed out. A letter names each route, placed where that route is
+farthest from the others so no letter hides another, and the trip ends are drawn as a hollow start
+and a solid finish.
 Rejected: one colour per route, because the map would then show which route is which but not where
 the weather bites, which is the question the dispatcher has.
-Enforced by: `frontend/src/plan/segments.ts`, `frontend/src/map/planLayers.ts`,
-`frontend/src/risk/levels.ts`; `segments.test.ts`.
+Enforced by: `frontend/src/plan/segments.ts`, `frontend/src/plan/labels.ts`,
+`frontend/src/map/planLayers.ts`, `frontend/src/risk/levels.ts`; `segments.test.ts`,
+`labels.test.ts`.
 
 ### D7. The cards, the map and the checkpoint list share one selection
 A new plan selects its recommended route. Choosing a route on its card or on the map selects it in
 both, and the checkpoint list below the cards shows that route's checkpoints. Hovering a checkpoint
 on the map shows its mile, ETA, level and readings; hovering or focusing a row in the list
-highlights the same checkpoint on the map, so the list is the keyboard way to the same detail. Once
+highlights the same checkpoint on the map, so the list is the keyboard way to the same detail. The
+list is one tab stop, and the arrow keys move between its rows. Times show the weekday and date,
+since a departure up to a week out and a two-day trip can repeat a weekday. Once
 a plan arrives the form collapses to a one-line summary and focus moves to the plan; "Edit" brings
 the form back with focus in its first field.
 Rejected: a separate detail panel per checkpoint, because it hides the map the detail is about.
