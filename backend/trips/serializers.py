@@ -2,13 +2,14 @@
 
 import math
 from datetime import datetime, timedelta
+from itertools import pairwise
 from typing import Any
 
 from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from providers.geo import Point, haversine_mi
+from providers.geo import Point, cumulative_mi, haversine_mi
 from risk.levels import Level
 from risk.recommendation import RankingKey, ranking_values
 from risk.scoring import display_round
@@ -21,7 +22,11 @@ DEPARTURE_PAST = timedelta(hours=1)
 DEPARTURE_AHEAD = timedelta(days=7)
 MIN_TRIP_MI = 1.0
 MAX_PATHS = 3
-MAX_PATH_POINTS = 5_000
+# A simplified Seattle to Miami route has about 2,900 points; this leaves room for longer ones.
+MAX_PATH_POINTS = 10_000
+# Longer than any North American truck trip (Key West to Prudhoe Bay is about 5,800 miles). It
+# bounds the corridor's work, which grows with path length (corridor-heatmap D3).
+MAX_PATH_MI = 8_000
 
 
 class PlaceSerializer(serializers.Serializer):
@@ -65,6 +70,8 @@ class TripTimingSerializer(serializers.Serializer):
 
 
 class PlanRequestSerializer(TripTimingSerializer):
+    """A trip to plan (plan-api D1)."""
+
     origin = PlaceSerializer()
     destination = PlaceSerializer()
     interval_mi = serializers.ChoiceField(choices=INTERVALS_MI, default=DEFAULT_INTERVAL_MI)
@@ -100,23 +107,38 @@ class PathField(serializers.Field):
             )
         points = []
         for i, item in enumerate(data):
-            if (
-                not isinstance(item, list)
-                or len(item) not in (2, 3)
-                or not all(
-                    isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
-                    for v in item
-                )
-                or not (-180 <= item[0] <= 180 and -90 <= item[1] <= 90)
-            ):
+            numbers = _coordinates(item)
+            if numbers is None or not (-180 <= numbers[0] <= 180 and -90 <= numbers[1] <= 90):
                 raise serializers.ValidationError(
                     f"Point {i} must be [longitude, latitude] with valid coordinates."
                 )
-            points.append(Point(float(item[1]), float(item[0])))
+            points.append(Point(numbers[1], numbers[0]))
+        for i, (a, b) in enumerate(pairwise(points), start=1):
+            if abs(b.lon - a.lon) > 180:
+                raise serializers.ValidationError(
+                    f"Point {i} crosses the 180th meridian, which routes here never do."
+                )
+        if cumulative_mi(points)[-1] > MAX_PATH_MI:
+            raise serializers.ValidationError(f"A path can be at most {MAX_PATH_MI:,} miles long.")
         return points
 
 
+def _coordinates(item: Any) -> list[float] | None:
+    """`[longitude, latitude]` or `[longitude, latitude, mile]` as floats, or `None`."""
+    if not isinstance(item, list) or len(item) not in (2, 3):
+        return None
+    if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in item):
+        return None
+    try:
+        numbers = [float(v) for v in item]
+    except OverflowError:  # A JSON integer too large for a float.
+        return None
+    return numbers if all(math.isfinite(v) for v in numbers) else None
+
+
 class CorridorRequestSerializer(TripTimingSerializer):
+    """The plan's paths to map, with its departure and load (corridor-heatmap D3)."""
+
     paths = serializers.ListField(child=PathField(), min_length=1, max_length=MAX_PATHS)
 
 

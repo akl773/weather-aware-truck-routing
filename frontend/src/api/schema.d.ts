@@ -94,7 +94,7 @@ export interface components {
             drivers: components["schemas"]["DriversEnum"][];
             gusty: boolean;
         };
-        /** @description Departure and load, shared by the plan and its corridor (D1, corridor-heatmap D3). */
+        /** @description The plan's paths to map, with its departure and load (corridor-heatmap D3). */
         CorridorRequest: {
             /** Format: date-time */
             departure: string;
@@ -193,7 +193,7 @@ export interface components {
             /** Format: double */
             lon: number;
         };
-        /** @description Departure and load, shared by the plan and its corridor (D1, corridor-heatmap D3). */
+        /** @description A trip to plan (plan-api D1). */
         PlanRequest: {
             /** Format: date-time */
             departure: string;
