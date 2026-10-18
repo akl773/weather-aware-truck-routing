@@ -43,7 +43,7 @@ class Series:
     rain_in_hr: tuple[float | None, ...]
     snow_in_hr: tuple[float | None, ...]
 
-    @property
+    @functools.cached_property
     def period_times(self) -> tuple[float, ...]:
         return tuple(t - 1800 for t in self.times)
 
