@@ -4,9 +4,10 @@ Pure: no Django, no I/O, no clock. Times in, times out.
 """
 
 import bisect
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from providers.geo import Point, interpolate
 from providers.routing import Route
@@ -26,10 +27,10 @@ class Checkpoint:
 
 def checkpoint_miles(distance_mi: float, interval_mi: float) -> list[float]:
     """Mile 0, every interval after it, and the destination, strictly increasing (D1)."""
-    if not distance_mi > 0:
-        raise ValueError("route distance must be positive")
-    if not interval_mi > 0:
-        raise ValueError("interval must be positive")
+    if not (math.isfinite(distance_mi) and distance_mi > 0):
+        raise ValueError("route distance must be a positive, finite number of miles")
+    if interval_mi not in INTERVALS_MI:
+        raise ValueError(f"interval must be one of {INTERVALS_MI} miles")
     miles = [0.0]
     k = 1
     while k * interval_mi < distance_mi - DESTINATION_SNAP_MI:
@@ -52,8 +53,11 @@ def seconds_at_mile(route: Route, mile: float) -> float:
 
 
 def place_checkpoints(route: Route, interval_mi: float, departure: datetime) -> list[Checkpoint]:
-    if departure.tzinfo is None:
+    if departure.tzinfo is None or departure.utcoffset() is None:
         raise ValueError("departure must be timezone-aware")
+    # In UTC, adding driving time is elapsed time. In a zone with daylight saving, Python adds
+    # wall-clock time and an ETA across the change would be an hour off (D3).
+    departure = departure.astimezone(UTC)
     return [
         Checkpoint(
             mile=mile,
@@ -67,16 +71,21 @@ def place_checkpoints(route: Route, interval_mi: float, departure: datetime) -> 
 def value_at(times: Sequence[float], values: Sequence[float | None], t: float) -> float | None:
     """The value at time `t`, linear between the samples around it (D4); `None` if unknown (D5).
 
-    `times` are increasing epoch seconds. Unknown means `t` is outside the samples or a bracketing
-    sample is missing. Never 0, because 0 reads as calm.
+    `times` are strictly increasing epoch seconds, one per value; the weather adapter guarantees
+    both. Unknown means `t` is outside the samples or a bracketing sample is missing or not a
+    finite number. Never 0, because 0 reads as calm.
     """
-    if not times or t < times[0] or t > times[-1]:
+    if not times or not math.isfinite(t) or t < times[0] or t > times[-1]:
         return None
     i = bisect.bisect_left(times, t)
     if times[i] == t:
-        return values[i]
-    before, after = values[i - 1], values[i]
+        return _finite(values[i])
+    before, after = _finite(values[i - 1]), _finite(values[i])
     if before is None or after is None:
         return None
     share = (t - times[i - 1]) / (times[i] - times[i - 1])
     return before + (after - before) * share
+
+
+def _finite(value: float | None) -> float | None:
+    return value if value is not None and math.isfinite(value) else None

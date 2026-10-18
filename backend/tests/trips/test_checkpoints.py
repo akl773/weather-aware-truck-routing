@@ -1,5 +1,7 @@
 import itertools
+import math
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -7,6 +9,7 @@ from providers.geo import Point
 from providers.routing import Route
 from trips.checkpoints import (
     DEFAULT_INTERVAL_MI,
+    DESTINATION_SNAP_MI,
     INTERVALS_MI,
     checkpoint_miles,
     place_checkpoints,
@@ -43,28 +46,43 @@ def test_destination_a_hair_past_a_multiple_replaces_it():
     assert checkpoint_miles(100.0001, 25) == [0, 25, 50, 75, 100.0001]
 
 
-def test_destination_just_beyond_the_snap_distance_keeps_both():
-    assert checkpoint_miles(100.06, 25) == [0, 25, 50, 75, 100, 100.06]
+@pytest.mark.parametrize(
+    ("distance", "miles"),
+    [
+        (100.05, [0, 25, 50, 75, 100.05]),
+        (100.051, [0, 25, 50, 75, 100, 100.051]),
+    ],
+)
+def test_destination_snaps_within_0_05_miles_of_a_multiple(distance, miles):
+    assert checkpoint_miles(distance, 25) == miles
 
 
 @pytest.mark.parametrize("interval", INTERVALS_MI)
-@pytest.mark.parametrize("distance", [0.3, 9.99, 24.9, 50, 333.3, 2855.4])
+@pytest.mark.parametrize("distance", [0.3, 9.99, 24.9, 50, 50.049, 100.04, 333.3, 2855.4])
 def test_checkpoints_are_strictly_increasing_and_span_the_route(interval, distance):
     miles = checkpoint_miles(distance, interval)
     assert miles[0] == 0
     assert miles[-1] == distance
     assert all(b > a for a, b in itertools.pairwise(miles))
-    assert all(b - a <= interval + 1e-9 for a, b in itertools.pairwise(miles))
+    # A snapped destination stretches the last gap by up to 0.05 mile.
+    assert all(b - a <= interval + DESTINATION_SNAP_MI for a, b in itertools.pairwise(miles))
 
 
-def test_default_interval_is_25_miles():
+def test_the_default_interval_is_one_of_the_choices():
     assert DEFAULT_INTERVAL_MI == 25
+    assert DEFAULT_INTERVAL_MI in INTERVALS_MI
 
 
-@pytest.mark.parametrize(("distance", "interval"), [(0, 25), (-5, 25), (100, 0)])
-def test_placement_rejects_impossible_input(distance, interval):
-    with pytest.raises(ValueError, match="positive"):
-        checkpoint_miles(distance, interval)
+@pytest.mark.parametrize("distance", [0, -5, math.inf, math.nan])
+def test_placement_rejects_impossible_distances(distance):
+    with pytest.raises(ValueError, match="positive, finite"):
+        checkpoint_miles(distance, 25)
+
+
+@pytest.mark.parametrize("interval", [0, 1e-6, 30])
+def test_only_the_three_offered_intervals_are_accepted(interval):
+    with pytest.raises(ValueError, match="one of"):
+        checkpoint_miles(100, interval)
 
 
 # --- ETA (D3) ------------------------------------------------------------------------------------
@@ -91,6 +109,14 @@ def test_eta_is_departure_plus_driving_time():
 def test_checkpoint_positions_lie_on_the_route():
     checkpoints = place_checkpoints(two_pace_route(), 25, DEPARTURE)
     assert checkpoints[1].point == pytest.approx(Point(40.0, -99.5))
+
+
+def test_eta_across_a_daylight_saving_change_is_elapsed_time():
+    # 2026-11-01 02:00 CDT falls back to 01:00 CST in Chicago.
+    departure = datetime(2026, 11, 1, 0, 0, tzinfo=ZoneInfo("America/Chicago"))
+    arrival = place_checkpoints(two_pace_route(), 25, departure)[-1].eta
+    assert arrival - departure == timedelta(hours=3)
+    assert arrival.tzinfo is UTC
 
 
 def test_naive_departure_is_rejected():
@@ -120,6 +146,12 @@ def test_value_outside_the_forecast_is_unknown():
 def test_missing_sample_is_unknown():
     assert value_at(HOURS, [10.0, None, 40.0], 1800) is None
     assert value_at(HOURS, [10.0, None, 40.0], 3600) is None
+
+
+def test_non_finite_sample_or_time_is_unknown():
+    assert value_at(HOURS, [10.0, math.nan, 40.0], 1800) is None
+    assert value_at(HOURS, [10.0, math.inf, 40.0], 3600) is None
+    assert value_at(HOURS, [10.0, 20.0, 40.0], math.nan) is None
 
 
 def test_zero_is_a_reading_not_a_gap():
