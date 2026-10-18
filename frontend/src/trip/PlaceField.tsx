@@ -10,6 +10,8 @@ import { type ApiError, type Place, searchPlaces } from "../api/client";
 import { useDebounced } from "../hooks/useDebounced";
 
 const MIN_QUERY = 2;
+// The longest search `/api/places` accepts.
+const MAX_QUERY = 100;
 const DEBOUNCE_MS = 250;
 const SUGGESTIONS_STALE_MS = 5 * 60 * 1000;
 
@@ -36,11 +38,15 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
   const suggestions = useQuery<Place[], ApiError>({
     queryKey: ["places", query],
     queryFn: ({ signal }) => searchPlaces(query, signal),
-    enabled: searching,
+    // Waits for the pause, so a swap or a pick does not search for the old text.
+    enabled: searching && query === text.trim(),
     staleTime: SUGGESTIONS_STALE_MS,
     placeholderData: keepPreviousData,
     retry: false,
   });
+
+  // Suggestions for text the user has since changed cannot be picked, so Enter never takes one.
+  const stale = query !== text.trim() || suggestions.isPlaceholderData;
 
   const noOptionsText =
     text.trim().length < MIN_QUERY
@@ -59,6 +65,7 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
       options={searching ? (suggestions.data ?? []) : value ? [value] : []}
       // The API already ranks matches; filtering again would hide good ones.
       filterOptions={(options) => options}
+      getOptionDisabled={() => searching && stale}
       getOptionLabel={(place) => place.label}
       getOptionKey={(place) => `${place.label}@${place.lat},${place.lon}`}
       isOptionEqualToValue={(a, b) => a.lat === b.lat && a.lon === b.lon && a.label === b.label}
@@ -72,6 +79,8 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
       noOptionsText={noOptionsText}
       autoHighlight
       handleHomeEndKeys
+      // Text that matches no pick stays put, so editing a place never wipes it.
+      clearOnBlur={false}
       renderInput={(params) => (
         <TextField
           {...params}
@@ -81,6 +90,7 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
           inputRef={inputRef}
           slotProps={{
             ...params.slotProps,
+            htmlInput: { ...params.slotProps.htmlInput, maxLength: MAX_QUERY },
             input: {
               ...params.slotProps.input,
               startAdornment: (
