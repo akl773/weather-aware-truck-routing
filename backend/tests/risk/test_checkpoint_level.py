@@ -71,8 +71,13 @@ def test_gust_flag_counts_load_rules():
     [
         {"wind_mph": -1},
         {"gust_mph": -0.1},
+        {"gust_mph": math.nan},
         {"rain_in_hr": math.nan},
         {"snow_in_hr": math.inf},
+        {"wind_mph": True},
+        {"rain_in_hr": None},
+        {"snow_in_hr": "0.2"},
+        pytest.param({"wind_mph": 10**400}, id="wind-too-large-for-a-float"),
     ],
 )
 def test_rejects_impossible_readings(overrides):
@@ -80,7 +85,10 @@ def test_rejects_impossible_readings(overrides):
         conditions(**overrides)
 
 
-@pytest.mark.parametrize("load_lb", [-1, math.nan])
+@pytest.mark.parametrize(
+    "load_lb",
+    [-1, math.nan, math.inf, True, None, pytest.param(10**400, id="too-large-for-a-float")],
+)
 def test_rejects_impossible_loads(load_lb):
     with pytest.raises(ValueError, match="must be a finite, non-negative number"):
         classify(conditions(), load_lb)

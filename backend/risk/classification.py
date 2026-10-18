@@ -81,9 +81,16 @@ class Condition(StrEnum):
     SNOW = "snow"
 
 
-def _require_reading(name: str, value: float) -> None:
+def _require_reading(name: str, value: object) -> None:
     # D6: corrupt data must fail loudly; read as zero it would look like a calm, Low checkpoint.
-    if not math.isfinite(value) or value < 0:
+    # bool is an int subclass, so True would otherwise pass as 1.
+    valid = isinstance(value, int | float) and not isinstance(value, bool)
+    if valid:
+        try:
+            valid = math.isfinite(value) and value >= 0
+        except OverflowError:  # an int too large for a float
+            valid = False
+    if not valid:
         raise ValueError(f"{name} must be a finite, non-negative number, got {value!r}")
 
 
