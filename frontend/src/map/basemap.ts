@@ -7,3 +7,7 @@ export const INITIAL_VIEW_STATE = {
   latitude: 38.5,
   zoom: 3.8,
 };
+
+// The style's first label layer: the heatmap draws beneath it so towns and roads stay readable
+// (stack D9, corridor-heatmap D5).
+export const FIRST_LABEL_LAYER_ID = "waterway_line_label";

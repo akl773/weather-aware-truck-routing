@@ -97,3 +97,68 @@ Rejected: a binary or base64 typed-array payload, because at about 30 KB gzipped
 already small, and the browser would need a decoder and a schema of its own.
 Enforced by: `trips.serializers.corridor_response`; `test_corridor_returns_a_level_per_cell_per_frame`,
 `test_corridor_numbers_are_the_numbers_shown`.
+
+### D5. The heatmap is fetched once after the plan and drawn under the routes
+The browser asks for the corridor as soon as a plan arrives, with that plan's paths, departure and
+load, and caches it per plan like the plan itself (ui D5): never retried on its own and never
+refetched on focus or reconnect. The routes and cards show at once and the heatmap appears when it
+lands; if it fails, the timeline says so and offers a retry while the routes stay usable. Cells are
+drawn as squares one cell size wide, under the routes and checkpoints, translucent enough that the
+basemap's towns and roads stay readable.
+Rejected: fetching the corridor in parallel with the plan, because its input is the plan's paths.
+Enforced by: `frontend/src/corridor/useCorridor.ts`, `frontend/src/corridor/heatmapLayers.ts`.
+
+### D6. Risk is the default view; wind, rain and snow are continuous ramps, not levels
+The default view colours each cell by its level for the trip's load, in the same colours as the
+routes (ui D6), so the heatmap and the cards say the same thing. Low is the faintest, so the eye
+goes to the weather that matters. The wind, rain and snow views colour each cell by that reading on
+a continuous ramp of its own hue that reaches full strength at the reading's No Travel threshold,
+with a legend in the reading's unit labelled at the reading's band edges, so the scale reads
+against the risk table. Cells without a forecast are grey in every view, and every legend shows
+that grey as Unknown. Legend swatches are the map's colours at half again their strength, since
+they sit on white rather than on the basemap. The raw views never use level colours, so they are
+not mistaken for risk, and they need no copy of the classification rules in the browser (D2).
+Rejected: classifying single readings in the browser to colour the raw views by band, because it
+would duplicate the graded rules D2 keeps on the server.
+Enforced by: `frontend/src/corridor/colors.ts`; `colors.test.ts`.
+
+### D7. Scrubbing is local: colours are precomputed per frame and blended between hours
+When the corridor arrives, each view's colours are computed once for every frame, as one flat byte
+array per frame. Moving the slider only blends the two frames either side of the slider's hour into
+a reused array and hands it to the cell layer as a new colour attribute; nothing is fetched, parsed
+or tessellated again. The slider moves in quarter hours (Page Up and Page Down jump three hours) and
+Play runs the 48 hours in 16 seconds, so the wind, rain and snow views visibly drift between the
+hourly frames instead of jumping. The risk view shows the nearest hourly frame: halfway between a
+Low and a Severe cell's colours is another level's colour, which no forecast gave. Play advances
+by each frame's elapsed time, capped at 100 ms, so a background tab resumes where it left off, and
+pausing settles on the nearest quarter hour so the arrows step from there. Each route's truck is drawn where its ETAs put it at the slider's hour,
+interpolated between checkpoints, and waits at the destination once it has arrived.
+The slider's hour lives in the map's own component, so scrubbing re-renders the map layers and the
+timeline and never the panel; the route layers are rebuilt only when the selection or highlight
+changes. The map's fit leaves room for the timeline's measured height, so the routes start clear of
+it on every screen size.
+Measured on 2026-10-19 on the production build (`vite build`, `vite preview`) in Chrome on an
+Apple M2 Pro laptop, 1440 × 900 CSS pixels at 2× on a 120 Hz display, with the live API, after the
+basemap's tiles had loaded. A slider step is a keyboard arrow press on the slider, 150 in a row;
+"React" is the synchronous update the press triggers, and "frame" is all `requestAnimationFrame`
+work in the next frame, which is where MapLibre and deck.gl draw. Play is 6 seconds of Play from
+hour 0.
+
+| Trip | Cells | React per step (p50 / p95) | Frame per step (p50 / p95) | Play frame interval (p50 / p95) |
+|---|---|---|---|---|
+| Denver to Salt Lake City | 193 | 0.3 / 0.8 ms | 4.7 / 10.3 ms | 16.6 / 25 ms |
+| New York to Los Angeles | 211 | 0.3 / 0.6 ms | 3.8 / 7.9 ms | 8.5 / 34 ms |
+
+A slider step costs about 11 ms at p95 in all, within the 16 ms budget (`AGENTS.md`), and no step
+makes a network request. A repaint of the same map with nothing changing costs 6.7 ms of frame
+work (p50) at this resolution, so most of each step is MapLibre redrawing the basemap with the
+overlay, which interleaved mode requires (stack D9). While the basemap is still loading tiles after
+a fit, single frames take up to 250 ms whether or not the slider moves. Play's median frame
+interval is one display frame or two (8.5 to 16.6 ms); one frame in twenty takes 25 to 34 ms,
+because a frame's map redraw plus the timeline's own repaint often exceeds the display's 8.3 ms. Giving the timeline its own compositor layer cut the frames over 20 ms
+during Play from 46 to 31 in 6 seconds.
+Rejected: one deck.gl layer per frame toggled by visibility, because 49 layers of the same geometry
+cost 49 times the GPU memory and cannot show the time between frames.
+Enforced by: `frontend/src/corridor/colors.ts` (`frameColors`, `blendFrames`),
+`frontend/src/corridor/truck.ts`, `frontend/src/corridor/Timeline.tsx`; `colors.test.ts`,
+`truck.test.ts`.

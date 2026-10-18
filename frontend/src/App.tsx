@@ -12,8 +12,8 @@ import type { components } from "./api/schema";
 import { Header } from "./layout/Header";
 import { Panel } from "./layout/Panel";
 import { CheckpointTooltip } from "./map/CheckpointTooltip";
-import { MapView } from "./map/MapView";
-import { type CheckpointPick, planBounds, planGeometry, planLayers } from "./map/planLayers";
+import { MapStage } from "./map/MapStage";
+import type { CheckpointPick } from "./map/planLayers";
 import { CheckpointList } from "./plan/CheckpointList";
 import { Recommendation, RouteCards } from "./plan/RouteCards";
 import { usePlan } from "./plan/usePlan";
@@ -53,16 +53,6 @@ export function App() {
         ? { routeId: selectedId, index: listed, checkpoint: listedCheckpoint }
         : hoverPick,
     [listed, listedCheckpoint, selectedId, hoverPick],
-  );
-
-  const bounds = useMemo(() => (data ? planBounds(data) : null), [data]);
-  const geometry = useMemo(() => (data ? planGeometry(data, selectedId) : null), [data, selectedId]);
-  const layers = useMemo(
-    () =>
-      geometry && request
-        ? planLayers({ geometry, request, selectedId, highlighted, onSelectRoute: select })
-        : [],
-    [geometry, request, selectedId, highlighted, select],
   );
 
   const onHover = (info: PickingInfo) => {
@@ -124,9 +114,13 @@ export function App() {
         ) : null}
       </Panel>
       {/* After the panel, so keyboard users reach the form before the map. */}
-      <MapView
-        layers={layers}
-        bounds={bounds}
+      <MapStage
+        plan={data}
+        planFetchedAt={plan.dataUpdatedAt}
+        request={request}
+        selectedId={selectedId}
+        highlighted={highlighted}
+        onSelectRoute={select}
         onHover={onHover}
         onMoveStart={() => setHover(null)}
       />

@@ -5,6 +5,8 @@ import type { components, paths } from "./schema";
 export type Place = components["schemas"]["Place"];
 export type PlanRequest = components["schemas"]["PlanRequest"];
 export type PlanResponse = components["schemas"]["PlanResponse"];
+export type CorridorRequest = components["schemas"]["CorridorRequest"];
+export type CorridorResponse = components["schemas"]["CorridorResponse"];
 
 interface ClientOptions {
   // Empty by default: the API is same-origin in development (Vite proxy) and production (nginx).
@@ -73,4 +75,8 @@ export function searchPlaces(q: string, signal?: AbortSignal, client: ApiClient 
 
 export function planTrip(body: PlanRequest, signal?: AbortSignal, client: ApiClient = api) {
   return call(() => client.POST("/api/plan", { body, signal }));
+}
+
+export function fetchCorridor(body: CorridorRequest, signal?: AbortSignal, client: ApiClient = api) {
+  return call(() => client.POST("/api/corridor", { body, signal }));
 }
