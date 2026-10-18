@@ -13,5 +13,8 @@ export function usePlan(request: PlanRequest | null) {
     staleTime: PLAN_STALE_MS,
     gcTime: PLAN_STALE_MS,
     retry: false,
+    // A refetch would resend a departure that may since have passed (plan-api D1).
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }

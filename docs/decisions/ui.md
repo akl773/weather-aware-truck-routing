@@ -22,9 +22,11 @@ Enforced by: `frontend/src/App.tsx`, `frontend/src/layout/Panel.tsx`.
 
 ### D2. Places come only from suggestions
 The origin and destination fields search `/api/places` as the user types (two characters or more,
-after a 250 ms pause) and hold a place only once one is picked. Typing again clears the pick, so the
-coordinates sent always belong to the label shown (routing D6). Suggestions are cached per query for
-five minutes.
+after a 250 ms pause, up to the API's 100) and hold a place only once one is picked. Typing again
+clears the pick but keeps the text, so the coordinates sent always belong to the label shown (routing
+D6). Suggestions for text the user has since changed stay visible but cannot be picked, so Enter
+never takes a place that does not match what was typed. Suggestions are cached per query for five
+minutes.
 Rejected: geocoding free text on submit, because a typo would silently plan a trip to the wrong
 town.
 Enforced by: `frontend/src/trip/PlaceField.tsx`.
@@ -33,7 +35,8 @@ Enforced by: `frontend/src/trip/PlaceField.tsx`.
 The departure field is the browser's native date-and-time input, which is keyboard accessible and
 localised. It defaults to the next full hour and is sent with the browser's UTC offset, so the API
 receives an exact instant (plan-api D1). Every time the app shows (ETAs, slider hours) is in the same
-zone, and the zone's short name is printed next to the field.
+zone, and the zone's short name at the chosen departure is printed next to the field. A time the
+clocks skip in spring is rejected rather than silently moved an hour.
 Rejected: showing each checkpoint in the time zone it lies in, because a trip across zones would
 show the truck arriving before it left.
 Enforced by: `frontend/src/trip/draft.ts` (`toOffsetIso`), `frontend/src/format.ts`;
@@ -52,6 +55,8 @@ Enforced by: `frontend/src/trip/draft.ts` (`validateTrip`); `draft.test.ts`.
 The plan is a query keyed by the exact request, so planning the same trip again within ten minutes
 shows the cached answer at once. A failed plan is not retried: a 4xx will fail the same way, and a
 retry after a weather rate limit (weather D4) only spends more of the budget the user is waiting on.
-The user retries with the button.
+Nor does the plan refetch on window focus or reconnect, which would resend a departure that may have
+passed. The user retries with the button, which also fetches a fresh plan for an identical trip once
+the cached one is ten minutes old.
 Rejected: a mutation, because it caches nothing and two clicks would plan twice.
 Enforced by: `frontend/src/plan/usePlan.ts`.
