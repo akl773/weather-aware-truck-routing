@@ -8,6 +8,12 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 8 },
   typography: {
-    fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    fontFamily: '"Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    button: { textTransform: "none", fontWeight: 600 },
+  },
+  components: {
+    MuiTextField: { defaultProps: { size: "small" } },
+    MuiAutocomplete: { defaultProps: { size: "small" } },
+    MuiButton: { defaultProps: { disableElevation: true } },
   },
 });
