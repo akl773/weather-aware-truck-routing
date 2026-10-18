@@ -88,3 +88,21 @@ LOAD_CASES = [
 @pytest.mark.parametrize(("mph", "load_lb", "expected"), LOAD_CASES)
 def test_load_rules(mph, load_lb, expected):
     assert wind_band_for_load(mph, load_lb) is expected
+
+
+# risk-classification D7: float noise from conversion and interpolation must not cross an edge.
+@pytest.mark.parametrize(
+    ("band", "noisy_value", "expected"),
+    [
+        (rain_band, 0.01 + (0.19 - 0.01) * 0.5, M),  # 0.09999999999999999
+        (rain_band, 1.0000000000000002, S),
+        (wind_band, 56.32704 / 1.609344, H),  # 35 mph from km/h: 34.99999999999999
+        (wind_band, 88.51392 / 1.609344, N),  # 55 mph from km/h: 54.99999999999999
+    ],
+)
+def test_float_noise_lands_on_the_edge(band, noisy_value, expected):
+    assert band(noisy_value) is expected
+
+
+def test_float_noise_cannot_escape_the_any_load_no_travel_rule():
+    assert wind_band_for_load(88.51392 / 1.609344, load_lb=1_000) is N

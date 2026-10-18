@@ -7,6 +7,13 @@ from enum import StrEnum
 
 from risk.levels import Level
 
+# D7: conversion and interpolation leave readings like 54.99999999999999 next to an edge.
+SNAP_DECIMALS = 6
+
+
+def snap(value: float) -> float:
+    return round(value, SNAP_DECIMALS)
+
 
 @dataclass(frozen=True)
 class BandEdges:
@@ -21,6 +28,7 @@ class BandEdges:
     no_travel_inclusive: bool
 
     def band(self, value: float) -> Level:
+        value = snap(value)
         if value > self.no_travel_at or (self.no_travel_inclusive and value == self.no_travel_at):
             return Level.NO_TRAVEL
         return Level(bisect_right(self.floors, value))
@@ -54,15 +62,15 @@ class LoadRule:
 
 
 LOAD_RULES = (
-    LoadRule(band=Level.SEVERE, over_lb=30_000, raises_to=Level.NO_TRAVEL),  # 45 to 54 mph
-    LoadRule(band=Level.HIGH, over_lb=40_000, raises_to=Level.SEVERE),  # 35 to 44 mph
+    LoadRule(band=Level.SEVERE, over_lb=30_000, raises_to=Level.NO_TRAVEL),  # wind in [45, 55)
+    LoadRule(band=Level.HIGH, over_lb=40_000, raises_to=Level.SEVERE),  # wind in [35, 45)
 )
 
 
 def wind_band_for_load(mph: float, load_lb: float) -> Level:
     band = wind_band(mph)
     for rule in LOAD_RULES:
-        if band is rule.band and load_lb > rule.over_lb:
+        if band is rule.band and snap(load_lb) > rule.over_lb:
             return rule.raises_to
     return band
 
