@@ -35,28 +35,33 @@ class CorridorTooLarge(ValueError):
     pass
 
 
-def _cells_within(samples: Sequence[Point], size: float, limit: int) -> set[tuple[int, int]] | None:
-    """Grid indices of cells near the samples at `size`, or `None` once there are over `limit`."""
+def _centre(row: int, col: int, size: float) -> Point:
+    """A cell's centre, its longitude wrapped into [-180, 180) as the weather provider needs."""
+    return Point(round(row * size, 4), round((col * size + 180) % 360 - 180, 4))
+
+
+def _cells_within(samples: Sequence[Point], size: float, limit: int) -> set[Point] | None:
+    """Centres of the cells near the samples at `size`, or `None` once there are over `limit`."""
     # A route point inside a cell is at most half the cell's diagonal from its centre, and at most
     # half a densify step from a sample, so this radius includes every cell a route crosses (D1).
     half_diagonal = size * MI_PER_DEG_LAT * math.sqrt(2) / 2
     radius = max(BUFFER_MI, half_diagonal + DENSIFY_MI / 2)
     radius_lat = radius / MI_PER_DEG_LAT
-    found: set[tuple[int, int]] = set()
+    found: set[Point] = set()
     for p in samples:
         # Longitude degrees shrink towards the poles: size the search for the box's polar edge.
         polar_lat = min(89.0, abs(p.lat) + radius_lat)
         radius_lon = radius / (MI_PER_DEG_LAT * math.cos(math.radians(polar_lat)))
-        for row in range(
-            math.ceil((p.lat - radius_lat) / size), math.floor((p.lat + radius_lat) / size) + 1
-        ):
+        # No cell centre lies past a pole.
+        first_row = max(math.ceil((p.lat - radius_lat) / size), math.ceil(-90 / size))
+        last_row = min(math.floor((p.lat + radius_lat) / size), math.floor(90 / size))
+        for row in range(first_row, last_row + 1):
             for col in range(
                 math.ceil((p.lon - radius_lon) / size), math.floor((p.lon + radius_lon) / size) + 1
             ):
-                if (row, col) in found:
-                    continue
-                if haversine_mi(p, Point(row * size, col * size)) <= radius:
-                    found.add((row, col))
+                centre = _centre(row, col, size)
+                if centre not in found and haversine_mi(p, centre) <= radius:
+                    found.add(centre)
                     if len(found) > limit:
                         return None
     return found
@@ -68,10 +73,7 @@ def corridor_cells(paths: Sequence[Sequence[Point]], max_cells: int = MAX_CELLS)
     for size in CELL_SIZES_DEG:
         found = _cells_within(samples, size, max_cells)
         if found is not None:
-            cells = tuple(
-                Point(round(row * size, 4), round(col * size, 4)) for row, col in sorted(found)
-            )
-            return Corridor(cell_deg=size, cells=cells)
+            return Corridor(cell_deg=size, cells=tuple(sorted(found)))
     raise CorridorTooLarge(
         f"The routes cover too much ground to map: more than {max_cells} cells at "
         f"{CELL_SIZES_DEG[-1]}°."
