@@ -101,7 +101,7 @@ Enforced by: `trips.serializers.corridor_response`; `test_corridor_returns_a_lev
 ### D5. The heatmap is fetched once after the plan and drawn under the routes
 The browser asks for the corridor as soon as a plan arrives, with that plan's paths, departure and
 load, and caches it per plan like the plan itself (ui D5): never retried on its own and never
-refetched on focus or reconnect. The routes and cards show at once and the heatmap fades in when it
+refetched on focus or reconnect. The routes and cards show at once and the heatmap appears when it
 lands; if it fails, the timeline says so and offers a retry while the routes stay usable. Cells are
 drawn as squares one cell size wide, under the routes and checkpoints, translucent enough that the
 basemap's towns and roads stay readable.
@@ -127,6 +127,27 @@ or tessellated again. The slider moves in quarter hours (Page Up and Page Down j
 Play runs the 48 hours in 16 seconds, so the weather visibly drifts between the hourly frames
 instead of jumping. Each route's truck is drawn where its ETAs put it at the slider's hour,
 interpolated between checkpoints, and waits at the destination once it has arrived.
+The slider's hour lives in the map's own component, so scrubbing re-renders the map layers and the
+timeline and never the panel; the route layers are rebuilt only when the selection or highlight
+changes.
+Measured on 2026-10-19 on the production build (`vite build`, `vite preview`) in Chrome on an
+Apple M2 Pro laptop, 1440 × 900 CSS pixels at 2× on a 120 Hz display, with the live API. A slider
+step is a keyboard arrow press on the slider, 150 in a row; "React" is the synchronous update the
+press triggers, and "frame" is all `requestAnimationFrame` work in the next frame, which is where
+MapLibre and deck.gl draw. Play is 6 seconds of Play from hour 0.
+
+| Trip | Cells | React per step (p50 / p95) | Frame per step (p50 / p95) | Play frame interval (p50 / p95) |
+|---|---|---|---|---|
+| Denver to Salt Lake City | 193 | 0.4 / 0.6 ms | 4.7 / 8.8 ms | 16.7 / 26 ms |
+| New York to Los Angeles | 211 | 0.3 / 0.7 ms | 3.6 / 8.6 ms | 16.7 / 26 ms |
+
+A slider step costs under 10 ms at p95 against the 16 ms budget (`AGENTS.md`), and no step makes a
+network request. A repaint of the same map with nothing changing costs 6.7 ms of frame work (p50) at
+this resolution, so most of each step is MapLibre redrawing the basemap with the overlay, which
+interleaved mode requires (stack D9). Play holds 60 frames a second; it does not reach the
+display's 120 because each frame's map redraw plus the timeline's own repaint exceeds 8.3 ms. Giving
+the timeline its own compositor layer cut the frames over 20 ms during Play from 46 to 31 in 6
+seconds.
 Rejected: one deck.gl layer per frame toggled by visibility, because 49 layers of the same geometry
 cost 49 times the GPU memory and cannot show the time between frames.
 Enforced by: `frontend/src/corridor/colors.ts` (`frameColors`, `blendFrames`),
