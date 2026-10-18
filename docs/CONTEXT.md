@@ -36,8 +36,8 @@ terms. If a new concept needs a name, add it here in the same PR.
 - **Load rules**: the spec's wind-and-weight rules that raise the wind band for heavy loads.
 - **Level**: a checkpoint's final class, the worst band after load rules. Ordered Low (0), Moderate
   (1), High (2), Severe (3), No Travel (4).
-- **Driver condition**: the condition that set a checkpoint's level. Shown to the user, e.g.
-  "snow 1.4 in/hr".
+- **Driver condition**: a condition whose band equals the checkpoint's level. Ties name every one.
+  Shown with its reading, e.g. "snow 2.4 in/hr".
 - **Gust flag**: marks a checkpoint where gusts reach a higher wind band than sustained wind. It
   informs the driver and never changes the level.
 

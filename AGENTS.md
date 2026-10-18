@@ -20,7 +20,7 @@ TypeScript frontend, MapLibre + deck.gl map.
 
 ## Layout
 
-- `backend/`: Django project.
+- `backend/`: Django project. Backend invariants: `backend/AGENTS.md`.
   - `risk/`: classification, load rules and ranking. Pure functions.
   - `providers/`: routing, geocoding and weather adapters.
   - `trips/`: API views and serializers that compose the two.
