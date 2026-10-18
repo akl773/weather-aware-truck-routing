@@ -1,8 +1,10 @@
 """Open-Meteo adapter: hourly wind, gusts, rain and snow in mph and inches (weather D1 to D6).
 
-Open-Meteo's variable names and hour conventions stop here. Callers get `Series` per lattice point.
+Open-Meteo's variable names, hour conventions and lattice stop here. Callers get a `Series` for each
+point they ask about.
 """
 
+import functools
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -65,13 +67,16 @@ def fetch_window(
     """
     hour = departure.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
     start = hour - timedelta(hours=1)
-    needed_h = max(MIN_WINDOW_H, math.ceil((needed_until - start).total_seconds() / 3600) + 1)
-    hours = 24 * math.ceil(needed_h / 24)
+    # The last hourly total is valid 30 minutes before the last hour (D3), so it needs half an
+    # hour of slack to cover `needed_until`.
+    needed_h = (needed_until - start).total_seconds() / 3600
+    hours = 24 * math.ceil(max(MIN_WINDOW_H, math.ceil(needed_h + 0.5) + 1) / 24)
     range_end = now.astimezone(UTC).replace(hour=23, minute=0, second=0, microsecond=0)
     range_end += timedelta(days=RANGE_DAYS)
     hours = min(hours, int((range_end - start).total_seconds() // 3600) + 1)
     if hours <= 0:
-        raise ProviderError("The departure is beyond the weather forecast range.")
+        # Callers validate the departure before asking, so this is a programming error.
+        raise ValueError("The departure is beyond the weather forecast range.")
     return start, hours
 
 
@@ -111,29 +116,30 @@ class OpenMeteo:
         self.client = client
 
     def hourly(self, points: Iterable[Point], start: datetime, hours: int) -> dict[Point, Series]:
-        """Series for each distinct lattice point the `points` snap to, keyed by lattice point."""
-        start_text = start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M")
-        lattice = sorted({snap(p) for p in points})
+        """The series for each point, read from the lattice point it snaps to (D4)."""
+        start = start.astimezone(UTC)
+        points = list(points)
+        start_text = start.strftime("%Y-%m-%dT%H:%M")
         keys = {
             request_key("openmeteo:hourly:v1", [p.lat, p.lon, start_text, hours]): p
-            for p in lattice
+            for p in sorted({snap(p) for p in points})
         }
-        return fetch_many_cached(keys, TTL_S, lambda missing: self._fetch(missing, start, hours))
+        answers = fetch_many_cached(
+            keys, TTL_S, lambda batch: self._fetch(batch, start, hours), BATCH_SIZE
+        )
+        try:
+            by_lattice = {p: parse_location(answer) for p, answer in answers.items()}
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ProviderError("The weather provider returned an unreadable answer.") from exc
+        return {p: by_lattice[snap(p)] for p in points}
 
-    def _fetch(self, points: Sequence[Point], start: datetime, hours: int) -> dict[Point, Series]:
-        end = start + timedelta(hours=hours - 1)
-        result: dict[Point, Series] = {}
-        for i in range(0, len(points), BATCH_SIZE):
-            batch = points[i : i + BATCH_SIZE]
-            data = self._request(batch, start, end)
-            locations = data if isinstance(data, list) else [data]
-            if len(locations) != len(batch):
-                raise ProviderError("The weather provider returned the wrong number of locations.")
-            try:
-                result.update(zip(batch, map(parse_location, locations), strict=True))
-            except (KeyError, TypeError, ValueError) as exc:
-                raise ProviderError("The weather provider returned an unreadable answer.") from exc
-        return result
+    def _fetch(self, batch: Sequence[Point], start: datetime, hours: int) -> dict[Point, Any]:
+        """One request for a batch of lattice points: the raw answer for each (D6)."""
+        data = self._request(batch, start, start + timedelta(hours=hours - 1))
+        locations = data if isinstance(data, list) else [data]
+        if len(locations) != len(batch):
+            raise ProviderError("The weather provider returned the wrong number of locations.")
+        return dict(zip(batch, locations, strict=True))
 
     def _request(self, batch: Sequence[Point], start: datetime, end: datetime) -> Any:
         form = {
@@ -163,6 +169,7 @@ class OpenMeteo:
             raise ProviderError("The weather provider returned an unreadable answer.") from exc
 
 
+@functools.cache
 def default() -> OpenMeteo:
-    """The app's client. Tests replace this function to replay recorded responses."""
+    """The app's shared client. Tests replace this function to replay recorded responses."""
     return OpenMeteo(httpx.Client(base_url=BASE_URL, timeout=TIMEOUT_S))
