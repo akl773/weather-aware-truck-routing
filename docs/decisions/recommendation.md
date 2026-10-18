@@ -49,9 +49,14 @@ Miles compare rounded to 0.1 mi, mean level to 0.01, and duration to the whole m
 wins on a difference the driver cannot see on the route cards, so two routes showing "3.2 Severe
 miles" are tied on that key and the next key decides. Routes still tied on every key keep the routing
 provider's order, which lists its preferred route first.
+Rounding happens once, in the backend, half up on the decimal value (12.25 → 12.3). The API sends
+these rounded values and the UI prints them without rounding again, because Python's `round` and
+JavaScript's `toFixed` disagree on halves (12.25 → 12.2 and 12.3), and the ranking must use exactly
+the numbers on screen.
 Rejected: comparing raw floats, because 0.0001 mi of floating-point difference would decide the
 recommendation while the cards show identical numbers.
-Enforced by: `risk.recommendation.ranking_key`; `test_differences_below_display_precision_tie`.
+Enforced by: `risk.scoring.display_round`, `risk.recommendation.ranking_key`;
+`test_display_round_rounds_halves_up`, `test_differences_below_display_precision_tie`.
 
 ### D5. When every route crosses No Travel, recommend the least bad and say so
 The top route is still recommended, and the result flags that every option crosses No Travel so the
