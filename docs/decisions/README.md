@@ -18,6 +18,7 @@ open a PR that edits the decision, says why, and updates the code and tests it g
 | `checkpoints-and-eta.md` | Sampling, ETA, forecast interpolation | #8 |
 | `weather.md` | Weather provider, units, cache | #9 |
 | `plan-api.md` | Plan request, response, unknown levels, errors | #10 |
+| `ui.md` | Layout, trip form, route display | #12, #13 |
 | `corridor-heatmap.md` | Corridor grid, frames, rendering, slider | #11, #14 |
 | `deployment.md` | Images, host, tunnel, deploy gate | #15 |
 
