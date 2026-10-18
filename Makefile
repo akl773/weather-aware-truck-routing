@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help dev dev-down dev-logs check check-api check-web test test-api test-web build-web \
-	sanity fmt api-types hooks-install deploy prod-check
+	e2e sanity fmt api-types hooks-install deploy prod-check
 
 DEV_COMPOSE := docker compose -f docker-compose.dev.yml
 API := cd backend &&
@@ -47,7 +47,7 @@ e2e: $(WEB_DEPS) ## Plan a trip and scrub the slider in Chromium, against record
 	$(WEB) npx playwright install chromium
 	$(WEB) npm run e2e
 
-sanity: check test build-web e2e ## Everything CI runs
+sanity: check test build-web e2e ## Every CI gate but the schema and secret checks
 	@echo "sanity: all gates passed"
 
 fmt: ## Format backend code

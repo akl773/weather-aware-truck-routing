@@ -37,7 +37,8 @@ Run from the repo root. `make help` lists every target.
 | `make dev` | api on :8000, web on :5173 (proxies `/api`), redis; all reload on save |
 | `make check` | ruff lint + format check, eslint, `tsc`. The pre-push hook runs this |
 | `make test` | pytest and vitest |
-| `make sanity` | everything CI runs: check, test and the production web build |
+| `make e2e` | the Playwright test in Chromium, against recorded API answers |
+| `make sanity` | check, test, the production web build and e2e; CI also checks `schema.d.ts` and runs gitleaks |
 | `make api-types` | regenerate `frontend/src/api/schema.d.ts` after any serializer change |
 | `make hooks-install` | gitleaks on commit, `make check` on push |
 | `make deploy` / `make prod-check` | ship HEAD (must be on `origin/main`) to production / compare the live SHA with `origin/main`; see `.claude/skills/deploy/` |
