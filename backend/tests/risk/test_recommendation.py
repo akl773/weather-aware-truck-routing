@@ -191,6 +191,8 @@ def test_a_sliver_of_unknown_miles_counts():
 
 
 def test_a_route_with_no_known_mile_ranks_last_on_mean_level():
-    blind = route("blind", unknown=0, mean_level=None)
-    known = route("known", mean_level=3.9)
+    # Equal unknown miles, so the mean decides: no known mile counts as all No Travel (4.0).
+    blind = route("blind", unknown=100, mean_level=None, distance=100)
+    known = route("known", unknown=100, mean_level=0.0, distance=150)
     assert ranked_ids(blind, known) == ["known", "blind"]
+    assert recommend([blind, known]).decided_by is RankingKey.MEAN_LEVEL
