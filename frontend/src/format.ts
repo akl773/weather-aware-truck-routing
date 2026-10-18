@@ -21,9 +21,11 @@ export function formatTime(iso: string | Date): string {
 
 /** "7 h 23 min", "45 min". */
 export function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const rest = Math.round(minutes - hours * 60);
-  return hours > 0 ? `${hours} h ${rest} min` : `${rest} min`;
+  const total = Math.round(minutes);
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
 /** "1,023.3 mi". The API rounds; this only pads and groups (recommendation D4). */

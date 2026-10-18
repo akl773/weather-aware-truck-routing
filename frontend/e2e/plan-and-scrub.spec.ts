@@ -87,7 +87,7 @@ test("plans a trip, compares three routes and scrubs 48 hours without a request"
   await slider.focus();
   await page.keyboard.press("End");
   await expect(slider).toHaveAttribute("aria-valuenow", "48");
-  await expect(timeline.getByText("48 h 0 min after departure")).toBeVisible();
+  await expect(timeline.getByText("48 h after departure")).toBeVisible();
   await page.keyboard.press("Home");
   await page.keyboard.press("PageUp");
   await expect(slider).toHaveAttribute("aria-valuenow", "3");
