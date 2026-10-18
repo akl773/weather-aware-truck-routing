@@ -2,9 +2,19 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from itertools import pairwise
 
 from risk.levels import Level
+
+
+def display_round(value: float, places: int) -> float:
+    """Round half up on the decimal value, the one rounding the ranking and the API share (D4).
+
+    `round()` rounds 12.25 to 12.2 and JavaScript's `toFixed` gives 12.3; this gives 12.3, and the
+    UI prints the result as is.
+    """
+    return float(Decimal(repr(value)).quantize(Decimal(1).scaleb(-places), ROUND_HALF_UP))
 
 
 @dataclass(frozen=True)

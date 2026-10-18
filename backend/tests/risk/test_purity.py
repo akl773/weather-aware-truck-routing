@@ -5,7 +5,16 @@ from pathlib import Path
 
 import risk
 
-ALLOWED_MODULES = {"bisect", "collections", "dataclasses", "enum", "functools", "itertools", "math"}
+ALLOWED_MODULES = {
+    "bisect",
+    "collections",
+    "dataclasses",
+    "decimal",
+    "enum",
+    "functools",
+    "itertools",
+    "math",
+}
 RISK_DIR = Path(risk.__file__).parent
 
 
