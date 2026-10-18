@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl
 
 import httpx
 
@@ -13,7 +14,12 @@ SECRET_PARAMS = {"api_key"}
 def request_signature(request: httpx.Request) -> dict[str, Any]:
     """What identifies a request in a recording: everything except the key."""
     query = sorted((k, v) for k, v in request.url.params.multi_items() if k not in SECRET_PARAMS)
-    body = json.loads(request.content) if request.content else None
+    if not request.content:
+        body = None
+    elif request.headers.get("content-type", "").startswith("application/x-www-form-urlencoded"):
+        body = sorted(parse_qsl(request.content.decode()))
+    else:
+        body = json.loads(request.content)
     return {"method": request.method, "path": request.url.path, "query": query, "body": body}
 
 
