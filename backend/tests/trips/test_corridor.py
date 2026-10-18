@@ -2,10 +2,11 @@ from datetime import timedelta
 
 import pytest
 
+import trips.plan
 from providers.geo import Point, cumulative_mi, resample
 from providers.open_meteo import BASE_URL as WEATHER_URL
 from providers.open_meteo import OpenMeteo, Series, snap
-from providers.routing import plan_routes
+from providers.routing import Route, plan_routes
 from providers.stadia import BASE_URL as ROUTING_URL
 from providers.stadia import StadiaMaps
 from risk.levels import Level
@@ -69,7 +70,7 @@ def test_a_cell_centre_25_1_miles_from_a_route_is_not():
 
 def test_cell_size_grows_until_the_corridor_fits(salt_lake_paths):
     corridor = corridor_cells(salt_lake_paths)
-    assert corridor.cell_deg == 0.3  # 0.15° needs 758 cells (corridor-heatmap D1)
+    assert corridor.cell_deg == 0.3  # these recorded routes need 752 cells at 0.15°
     fits = len(corridor.cells)
     assert corridor_cells(salt_lake_paths, fits).cell_deg == 0.3
     assert corridor_cells(salt_lake_paths, fits - 1).cell_deg > 0.3
@@ -87,6 +88,18 @@ def test_cell_centres_sit_on_the_weather_lattice(salt_lake_paths):
         assert all(snap(cell) == cell for cell in corridor.cells)
         cap = len(corridor.cells) - 1
     assert sizes == list(CELL_SIZES_DEG)
+
+
+def test_cells_near_the_180th_meridian_wrap_into_range():
+    corridor = corridor_cells([[Point(65.0, 179.9), Point(65.0, 179.99)]])
+    assert all(-180 <= cell.lon < 180 for cell in corridor.cells)
+    assert any(cell.lon < 0 for cell in corridor.cells)
+    assert len(set(corridor.cells)) == len(corridor.cells)
+
+
+def test_no_cell_lies_past_a_pole():
+    corridor = corridor_cells([[Point(89.9, 0.0), Point(89.9, 10.0)]])
+    assert all(-90 <= cell.lat <= 90 for cell in corridor.cells)
 
 
 def test_a_corridor_too_large_at_the_coarsest_size_is_refused(salt_lake_paths):
@@ -121,7 +134,7 @@ def test_frames_run_from_departure_to_48_hours(recorded_frames):
     assert all(len(f.levels) == len(f.readings) == len(corridor.cells) for f in frames)
 
 
-def test_a_cell_level_matches_a_checkpoint_there(recorded_frames, recorded_weather):
+def test_cell_readings_follow_the_checkpoint_rules(recorded_frames, recorded_weather):
     corridor, frames = recorded_frames
     series = recorded_weather.hourly(corridor.cells, PLAN_DEPARTURE - timedelta(hours=1), 72)
     for frame in frames[::6]:
@@ -151,3 +164,71 @@ def test_frame_levels_apply_the_load_rules(load_lb, level):
         now=PLAN_NOW,
     )
     assert {lvl for frame in frames for lvl in frame.levels} == {level}
+
+
+class OneGap:
+    """Calm everywhere, except no rain forecast in hour 2 of the window."""
+
+    def hourly(self, points, start, hours):
+        times = tuple(start.timestamp() + 3600 * k for k in range(hours))
+        calm = (0.0,) * hours
+        rain = tuple(None if k == 2 else 0.0 for k in range(hours))
+        return {p: Series(times, calm, calm, rain, calm) for p in points}
+
+
+def test_a_cell_without_a_full_forecast_is_unknown():
+    # The window starts an hour before departure (11:00). Rain sample 2 is valid at 12:30, so
+    # every time from 11:30 to 13:30 interpolates with it: frames at 12:00 and 13:00.
+    frames = corridor_frames(
+        corridor_cells([CORRIDOR_PATH]),
+        departure=PLAN_DEPARTURE,
+        load_lb=LOAD_LB,
+        weather=OneGap(),
+        now=PLAN_NOW,
+    )
+    assert set(frames[0].levels) == set(frames[1].levels) == {None}
+    assert {r.rain_in_hr for r in frames[1].readings} == {None}
+    assert {r.wind_mph for r in frames[1].readings} == {0.0}
+    assert set(frames[2].levels) == {Level.LOW}
+
+
+def straight_route_from(start: Point) -> Route:
+    points = tuple(Point(start.lat + 0.5 * i / 50, start.lon) for i in range(51))
+    cum_mi = tuple(cumulative_mi(points))
+    return Route(points, cum_mi, tuple(m * 60 for m in cum_mi))
+
+
+class Warming:
+    """Wind rising 3 mph an hour from 20 mph at the plan's departure, so the hour matters."""
+
+    def hourly(self, points, start, hours):
+        times = tuple(start.timestamp() + 3600 * k for k in range(hours))
+        wind = tuple(20.0 + 3 * (t - PLAN_DEPARTURE.timestamp()) / 3600 for t in times)
+        calm = (0.0,) * hours
+        return {p: Series(times, wind, wind, calm, calm) for p in points}
+
+
+@pytest.mark.parametrize("hour", [0, 5, 7])
+def test_a_cell_matches_a_plan_checkpoint_at_its_centre(monkeypatch, hour):
+    corridor = corridor_cells([CORRIDOR_PATH])
+    cell = corridor.cells[len(corridor.cells) // 2]
+    departure = PLAN_DEPARTURE + timedelta(hours=hour)
+    monkeypatch.setattr(trips.plan, "plan_routes", lambda *args: [straight_route_from(cell)])
+    plan = trips.plan.plan_trip(
+        origin=cell,
+        destination=Point(cell.lat + 0.5, cell.lon),
+        departure=departure,
+        load_lb=LOAD_LB,
+        interval_mi=25,
+        router=None,
+        weather=Warming(),
+        now=PLAN_NOW,
+    )
+    checkpoint = plan.routes[0].checkpoints[0]
+    frame = corridor_frames(
+        corridor, departure=PLAN_DEPARTURE, load_lb=LOAD_LB, weather=Warming(), now=PLAN_NOW
+    )[hour]
+    i = corridor.cells.index(cell)
+    assert checkpoint.eta == departure
+    assert frame.readings[i] == checkpoint.readings
+    assert frame.levels[i] == checkpoint.level

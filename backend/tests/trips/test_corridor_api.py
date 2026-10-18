@@ -1,3 +1,5 @@
+import math
+
 import pytest
 from django.core.cache import cache
 from django.test import Client
@@ -16,6 +18,7 @@ from tests.providers.scenarios import (
 from trips.serializers import MAX_PATH_POINTS, CorridorRequestSerializer
 
 PATH = [[p.lon, p.lat] for p in CORRIDOR_PATH]
+MI_PER_DEG = 3958.8 * math.pi / 180  # along the equator, on the API's haversine earth
 
 
 @pytest.fixture(autouse=True)
@@ -122,12 +125,44 @@ def test_corridor_rejects_a_malformed_path(path):
 
 @pytest.mark.parametrize(("lon", "lat"), [(180, 0), (-180, 0), (0, 90), (0, -90)])
 def test_corridor_accepts_coordinates_on_their_limits(lon, lat):
-    assert valid(paths=[[[lon, lat], [0, 0]]])
+    assert valid(paths=[[[lon, lat], [lon, lat]]])
 
 
 @pytest.mark.parametrize(("lon", "lat"), [(180.01, 0), (-180.01, 0), (0, 90.01), (0, -90.01)])
 def test_corridor_rejects_coordinates_past_their_limits(lon, lat):
-    assert not valid(paths=[[[lon, lat], [0, 0]]])
+    assert not valid(paths=[[[lon, lat], [lon, lat]]])
+
+
+@pytest.mark.parametrize(
+    "point", [[10**400, 39.7], [-105.0, 39.7, 10**400]], ids=["coordinate", "mile"]
+)
+def test_corridor_rejects_an_integer_too_large_for_a_float(point):
+    response = post(request(paths=[[point, [-105.1, 39.8]]]))
+    assert response.status_code == 400
+    assert "paths" in response.json()["fields"]
+
+
+def equator_path(miles: float) -> list[list[float]]:
+    """Due east along the equator for `miles`, in one-degree steps."""
+    degrees = miles / MI_PER_DEG
+    steps = math.ceil(degrees)
+    return [[-60 + degrees * k / steps, 0.0] for k in range(steps + 1)]
+
+
+def test_corridor_accepts_a_path_just_under_8000_miles():
+    assert valid(paths=[equator_path(7_999)])
+
+
+def test_corridor_rejects_a_path_just_over_8000_miles():
+    response = post(request(paths=[equator_path(8_001)]))
+    assert response.status_code == 400
+    assert "8,000 miles" in response.json()["detail"]
+
+
+def test_corridor_rejects_a_path_across_the_180th_meridian():
+    response = post(request(paths=[[[179.9, 52.0], [-179.9, 52.0]]]))
+    assert response.status_code == 400
+    assert "180th meridian" in response.json()["detail"]
 
 
 def test_corridor_rejects_a_departure_without_an_offset():
@@ -139,9 +174,14 @@ def test_corridor_rejects_a_load_over_80000():
 
 
 def test_corridor_rejects_routes_that_cover_too_much_ground():
-    # Sweeping the continent row by row: no cell size on the ladder fits it in 250 cells.
-    sweep = [[-125.0 if row % 2 else -67.0, 25.0 + row] for row in range(25)]
-    response = post(request(paths=[sweep]))
+    # Three sweeps across the continent, each under 8,000 miles, together cover six bands: more
+    # than 250 cells even at 1.0°.
+    sweeps = [
+        [[-110, 26], [-80, 26], [-80, 32], [-110, 32]],
+        [[-120, 36], [-75, 36], [-75, 42], [-120, 42]],
+        [[-120, 46], [-70, 46], [-70, 50], [-120, 50]],
+    ]
+    response = post(request(paths=sweeps))
     assert response.status_code == 400
     assert "too much ground" in response.json()["fields"]["paths"][0]
 
