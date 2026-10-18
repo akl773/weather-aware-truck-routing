@@ -23,7 +23,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0 # publishes no floating major tag
         with:
           working-directory: backend
           enable-cache: true
@@ -59,7 +59,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           working-directory: backend
           enable-cache: true
@@ -79,6 +79,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The CLI image at the version pre-commit pins, so local and CI scans agree. It runs as the
+      # runner's user so git accepts the checkout, and a scan that reads no commits fails instead of
+      # passing silently.
+      - name: gitleaks (full history)
+        run: |
+          set +e
+          out=$(docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 git --no-banner --redact -v /repo 2>&1)
+          status=$?
+          echo "$out"
+          echo "$out" | grep -qE '[1-9][0-9]* commits scanned' || { echo "::error::gitleaks scanned no commits"; exit 1; }
+          exit $status
