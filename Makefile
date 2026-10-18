@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help dev dev-down dev-logs check check-api check-web test test-api test-web build-web \
-	sanity fmt api-types hooks-install
+	sanity fmt api-types hooks-install deploy prod-check
 
 DEV_COMPOSE := docker compose -f docker-compose.dev.yml
 API := cd backend &&
@@ -55,6 +55,17 @@ api-types: $(WEB_DEPS) ## Regenerate frontend API types from the backend OpenAPI
 	$(API) DJANGO_SECRET_KEY=schema-only uv run python manage.py spectacular \
 		--format openapi-json --file ../frontend/openapi.json
 	$(WEB) API_SCHEMA=openapi.json npm run -s api:types; status=$$?; rm -f openapi.json; exit $$status
+
+# --- Production --------------------------------------------------------------
+
+deploy: ## Build, ship and roll the production stack (HEAD must be on origin/main)
+	./deploy.sh
+
+prod-check: ## Compare the live site's commit with origin/main
+	@git fetch -q origin main
+	@live=$$(curl -fsS https://spotter.akhilsingh.in/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p'); \
+	want=$$(git rev-parse --short origin/main); \
+	echo "live: $$live  origin/main: $$want"; [ "$$live" = "$$want" ]
 
 # --- Setup -------------------------------------------------------------------
 
