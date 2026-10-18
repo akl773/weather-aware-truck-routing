@@ -163,6 +163,22 @@ def test_an_empty_answer_is_no_route():
         plan_routes(FakeRouter([]), ORIGIN, DESTINATION, 30_000)
 
 
+NOWHERE = Route((ORIGIN, ORIGIN), (0.0, 0.0), (0.0, 0.0))
+
+
+def test_a_route_with_no_length_is_dropped():
+    routes = plan_routes(
+        FakeRouter([NOWHERE, bend(0), bend(30), bend(-30)]), ORIGIN, DESTINATION, 30_000
+    )
+    assert NOWHERE not in routes
+    assert len(routes) == 3
+
+
+def test_only_routes_with_no_length_is_no_route():
+    with pytest.raises(NoRouteError):
+        plan_routes(FakeRouter([NOWHERE]), ORIGIN, DESTINATION, 30_000)
+
+
 def test_via_points_are_rounded_to_6_decimals():
     router = FakeRouter([bend(0), bend(30)], via=[bend(-30)])
     plan_routes(router, ORIGIN, DESTINATION, 30_000)

@@ -25,13 +25,20 @@ from providers.errors import NoRouteError  # noqa: E402
 from providers.routing import plan_routes  # noqa: E402
 from tests.providers.replay import FIXTURES, request_signature  # noqa: E402
 from tests.providers.scenarios import (  # noqa: E402
+    DENVER,
     LOAD_LB,
     PLACES_SCENARIOS,
+    PLAN_DEPARTURE,
+    PLAN_INTERVAL_MI,
+    PLAN_NOW,
+    PLAN_WEATHER_FIXTURE,
     ROUTE_SCENARIOS,
+    SALT_LAKE_CITY,
     WEATHER_HOURS,
     WEATHER_SCENARIOS,
     WEATHER_START,
 )
+from trips.plan import plan_trip  # noqa: E402
 
 
 class RecordingTransport(httpx.BaseTransport):
@@ -99,6 +106,21 @@ def main() -> None:
                 )
             finally:
                 open_meteo.BATCH_SIZE = original
+        live_maps = stadia.StadiaMaps(httpx.Client(base_url=stadia.BASE_URL, timeout=60), key)
+        record(
+            PLAN_WEATHER_FIXTURE,
+            lambda c: plan_trip(
+                origin=DENVER,
+                destination=SALT_LAKE_CITY,
+                departure=PLAN_DEPARTURE,
+                load_lb=LOAD_LB,
+                interval_mi=PLAN_INTERVAL_MI,
+                router=live_maps,
+                weather=open_meteo.OpenMeteo(c),
+                now=PLAN_NOW,
+            ),
+            base_url=open_meteo.BASE_URL,
+        )
 
 
 if __name__ == "__main__":

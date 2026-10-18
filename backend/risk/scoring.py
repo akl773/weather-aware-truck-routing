@@ -24,14 +24,16 @@ def display_round(value: float, places: int, *, up: bool = False) -> float:
 @dataclass(frozen=True)
 class CheckpointLevel:
     mile: float  # distance from the origin along the route
-    level: Level
+    level: Level | None  # None when the weather at the ETA is unknown (D7)
 
 
-def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[float]:
-    """Miles of road each checkpoint speaks for (D1).
+def owned_stretches(
+    checkpoint_miles: Sequence[float], route_miles: float
+) -> list[tuple[float, float]]:
+    """Where each checkpoint's stretch of road starts and ends (D1).
 
     Boundaries sit halfway between neighbouring checkpoints; the first stretch starts at the origin
-    and the last ends at the destination, so the result always sums to `route_miles`.
+    and the last ends at the destination, so the stretches tile the route.
     """
     if not checkpoint_miles:
         raise ValueError("a route needs at least one checkpoint")
@@ -46,8 +48,12 @@ def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[f
         raise ValueError("checkpoints must lie within the route")
 
     midpoints = [(a + b) / 2 for a, b in pairwise(checkpoint_miles)]
-    boundaries = [0.0, *midpoints, route_miles]
-    return [end - start for start, end in pairwise(boundaries)]
+    return list(pairwise([0.0, *midpoints, route_miles]))
+
+
+def owned_miles(checkpoint_miles: Sequence[float], route_miles: float) -> list[float]:
+    """Miles of road each checkpoint speaks for (D1); they always sum to `route_miles`."""
+    return [end - start for start, end in owned_stretches(checkpoint_miles, route_miles)]
 
 
 @dataclass(frozen=True)
@@ -56,7 +62,10 @@ class RouteSummary:
     distance_miles: float
     duration_s: float
     miles_by_level: tuple[float, ...]  # indexed by Level
-    mean_level: float  # 0 (all Low) to 4 (all No Travel), weighted by owned miles
+    unknown_miles: float  # owned by checkpoints whose weather is unknown (D7)
+    # 0 (all Low) to 4 (all No Travel), weighted by owned miles over the known miles only (D2, D7);
+    # None when no mile of the route has a known level.
+    mean_level: float | None
 
     def miles_at(self, level: Level) -> float:
         return self.miles_by_level[level]
@@ -72,14 +81,25 @@ def summarize_route(
         raise ValueError(f"duration must be finite and non-negative, got {duration_s!r}")
     owned = owned_miles([checkpoint.mile for checkpoint in checkpoints], distance_miles)
     miles_by_level = [0.0] * len(Level)
+    unknown_miles = 0.0
     for checkpoint, miles in zip(checkpoints, owned, strict=True):
-        miles_by_level[checkpoint.level] += miles
+        if checkpoint.level is None:
+            unknown_miles += miles
+        else:
+            miles_by_level[checkpoint.level] += miles
     # D2: weighted by owned miles, so the sampling interval does not change the mean.
-    mean_level = sum(level * miles for level, miles in enumerate(miles_by_level)) / distance_miles
+    # D7: over known miles only, so unknown road is neither calm nor dangerous here.
+    known_miles = sum(miles_by_level)
+    mean_level = (
+        sum(level * miles for level, miles in enumerate(miles_by_level)) / known_miles
+        if known_miles > 0
+        else None
+    )
     return RouteSummary(
         route_id=route_id,
         distance_miles=distance_miles,
         duration_s=duration_s,
         miles_by_level=tuple(miles_by_level),
+        unknown_miles=unknown_miles,
         mean_level=mean_level,
     )

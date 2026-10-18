@@ -10,16 +10,18 @@ def route(
     no_travel: float = 0,
     severe: float = 0,
     high: float = 0,
-    mean_level: float = 0.5,
+    unknown: float = 0,
+    mean_level: float | None = 0.5,
     minutes: float = 300,
     distance: float = 300,
 ) -> RouteSummary:
-    low = distance - no_travel - severe - high
+    low = distance - no_travel - severe - high - unknown
     return RouteSummary(
         route_id=route_id,
         distance_miles=distance,
         duration_s=minutes * 60,
         miles_by_level=(low, 0.0, high, severe, no_travel),
+        unknown_miles=unknown,
         mean_level=mean_level,
     )
 
@@ -171,3 +173,26 @@ def test_a_sliver_of_no_travel_on_every_route_sets_the_flag():
     assert recommend(
         [route("a", no_travel=0.04), route("b", no_travel=0.02)]
     ).all_routes_cross_no_travel
+
+
+# recommendation D7: unknown miles rank right after No Travel miles.
+def test_unknown_miles_rank_after_no_travel_and_before_severe():
+    unknown = route("unknown", unknown=10)
+    severe = route("severe", severe=200)
+    no_travel = route("no_travel", no_travel=1)
+    assert ranked_ids(no_travel, unknown, severe) == ["severe", "unknown", "no_travel"]
+
+
+def test_a_sliver_of_unknown_miles_counts():
+    result = recommend([route("gap", unknown=0.01), route("known", high=40)])
+    assert result.recommended.route_id == "known"
+    assert result.decided_by is RankingKey.UNKNOWN_MILES
+    assert result.reason == ("Fewest miles without a forecast: 0.0 vs 0.1 on the next best route.")
+
+
+def test_a_route_with_no_known_mile_ranks_last_on_mean_level():
+    # Equal unknown miles, so the mean decides: no known mile counts as all No Travel (4.0).
+    blind = route("blind", unknown=100, mean_level=None, distance=100)
+    known = route("known", unknown=100, mean_level=0.0, distance=150)
+    assert ranked_ids(blind, known) == ["known", "blind"]
+    assert recommend([blind, known]).decided_by is RankingKey.MEAN_LEVEL

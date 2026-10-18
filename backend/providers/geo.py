@@ -129,3 +129,36 @@ def offset_point(anchor: Point, origin: Point, destination: Point, offset_mi: fl
         anchor.lat + left_y * offset_mi / mi_per_deg_lat,
         anchor.lon + left_x * offset_mi / mi_per_deg_lon,
     )
+
+
+def simplify(points: Sequence[Point], tolerance_deg: float) -> list[int]:
+    """Indices of the points Douglas-Peucker keeps at `tolerance_deg` (plan-api D4).
+
+    Distances are planar in degrees with longitude scaled by the cosine of latitude, which is
+    accurate enough for deciding what to draw. Always keeps the first and last point.
+    """
+    if len(points) <= 2:
+        return list(range(len(points)))
+    scale = math.cos(math.radians(sum(p.lat for p in points) / len(points)))
+    xy = [(p.lon * scale, p.lat) for p in points]
+    keep = [False] * len(points)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(points) - 1)]
+    while stack:
+        first, last = stack.pop()
+        (ax, ay), (bx, by) = xy[first], xy[last]
+        dx, dy = bx - ax, by - ay
+        length = math.hypot(dx, dy)
+        worst, worst_at = -1.0, -1
+        for i in range(first + 1, last):
+            px, py = xy[i]
+            if length == 0:
+                distance = math.hypot(px - ax, py - ay)
+            else:
+                distance = abs(dy * px - dx * py + bx * ay - by * ax) / length
+            if distance > worst:
+                worst, worst_at = distance, i
+        if worst > tolerance_deg:
+            keep[worst_at] = True
+            stack += [(first, worst_at), (worst_at, last)]
+    return [i for i, kept in enumerate(keep) if kept]

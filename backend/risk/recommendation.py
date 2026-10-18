@@ -10,6 +10,7 @@ from risk.scoring import RouteSummary, display_round
 
 class RankingKey(StrEnum):
     NO_TRAVEL_MILES = "no_travel_miles"
+    UNKNOWN_MILES = "unknown_miles"
     SEVERE_MILES = "severe_miles"
     HIGH_MILES = "high_miles"
     MEAN_LEVEL = "mean_level"
@@ -21,9 +22,16 @@ def ranking_values(summary: RouteSummary) -> dict[RankingKey, float]:
     return {
         # D3: rounded up, so a sliver of No Travel never ties with a clean route.
         RankingKey.NO_TRAVEL_MILES: display_round(summary.miles_at(Level.NO_TRAVEL), 1, up=True),
+        # D7: unknown road ranks right after No Travel, and a sliver of it counts too.
+        RankingKey.UNKNOWN_MILES: display_round(summary.unknown_miles, 1, up=True),
         RankingKey.SEVERE_MILES: display_round(summary.miles_at(Level.SEVERE), 1),
         RankingKey.HIGH_MILES: display_round(summary.miles_at(Level.HIGH), 1),
-        RankingKey.MEAN_LEVEL: display_round(summary.mean_level, 2),
+        # D7: a route with no known mile ranks as if it were all No Travel on this key.
+        RankingKey.MEAN_LEVEL: (
+            float(Level.NO_TRAVEL)
+            if summary.mean_level is None
+            else display_round(summary.mean_level, 2)
+        ),
         RankingKey.DURATION: display_round(summary.duration_s / 60, 0),
     }
 
@@ -64,6 +72,7 @@ def recommend(summaries: Sequence[RouteSummary]) -> Recommendation:
 
 _REASONS = {
     RankingKey.NO_TRAVEL_MILES: "Fewest No Travel miles: {best} vs {next}",
+    RankingKey.UNKNOWN_MILES: "Fewest miles without a forecast: {best} vs {next}",
     RankingKey.SEVERE_MILES: "Fewest Severe miles: {best} vs {next}",
     RankingKey.HIGH_MILES: "Fewest High miles: {best} vs {next}",
     RankingKey.MEAN_LEVEL: "Lowest average risk: {best} vs {next}",

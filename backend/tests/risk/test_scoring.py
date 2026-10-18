@@ -92,3 +92,20 @@ def test_summarize_route_rejects_impossible_durations(duration_s):
 def test_display_round_rejects_non_finite_values(value):
     with pytest.raises(ValueError, match="finite"):
         display_round(value, 1)
+
+
+# recommendation D7: unknown checkpoints own miles that count at no level.
+def test_mean_level_ignores_unknown_miles():
+    summary = summarize_route(
+        "a", 100, 3600, [CheckpointLevel(0, H), CheckpointLevel(50, None), CheckpointLevel(100, L)]
+    )
+    # Owned miles: 25 High, 50 unknown, 25 Low.
+    assert summary.unknown_miles == 50
+    assert summary.miles_at(H) == 25
+    assert summary.mean_level == 1.0  # (2 * 25 + 0 * 25) / 50 known miles
+
+
+def test_a_route_with_no_known_mile_has_no_mean_level():
+    summary = summarize_route("a", 10, 600, [CheckpointLevel(0, None), CheckpointLevel(10, None)])
+    assert summary.unknown_miles == 10
+    assert summary.mean_level is None

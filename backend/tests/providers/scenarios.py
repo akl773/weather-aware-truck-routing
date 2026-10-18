@@ -43,3 +43,10 @@ WEATHER_SCENARIOS = {
     # The same points with a batch size of 2, to record a multi-request fetch.
     "openmeteo_i70_batched": (I70_POINTS, 2),
 }
+
+# A whole plan: Denver to Salt Lake City at the default interval. Routes replay from
+# stadia_route_denver_salt_lake_city; the checkpoint weather from the plan recording.
+PLAN_NOW = datetime(2026, 10, 18, 18, 0, tzinfo=UTC)
+PLAN_DEPARTURE = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+PLAN_INTERVAL_MI = 25
+PLAN_WEATHER_FIXTURE = "openmeteo_plan_denver_salt_lake_city"
