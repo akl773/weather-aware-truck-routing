@@ -18,13 +18,14 @@ it.
 | Checkpoint level, drivers | `classify` | D5 |
 | Gust flag | `classify` (`gusty`) | D3 |
 | Input validation | `Conditions.__post_init__`, `_require_reading` | D6 |
+| Float-noise snapping | `snap`, used by `BandEdges.band` and the load rules | D7 |
 
 ## Changing a threshold or rule
 
 1. Edit the decision record first: the table at the top and the decision that owns the rule. A rule
    change without a record change is a bug by definition (AGENTS.md).
 2. Add test rows for both sides of the new edge (`*_CASES` tables in
-   `backend/tests/risk/test_classification.py`). Run them and watch them fail.
+   `backend/tests/risk/test_bands.py`). Run them and watch them fail.
 3. Change only the data: the `BandEdges` floors and No Travel operator, or a `LoadRule`. The
    functions are generic over these tables, so a threshold change needs no logic change.
 4. `make test`, then check the monotonicity test still passes: a higher value must never give a
@@ -36,6 +37,8 @@ it.
   snow are Severe (D2). Wind at exactly 55 mph is No Travel. Do not "simplify" to one operator.
 - **"More than 30,000 lb" is strict.** A load of exactly 30,000 lb is unaffected (D4).
 - **Gusts never change the level**, only `gusty` (D3). Ranking reads `level`.
+- **Compare through `snap`.** Any new comparison against an edge must snap the reading first, or
+  54.99999999999999 mph escapes the No Travel rule (D7).
 - **Never default a missing reading to 0.** `Conditions` rejects negatives and NaN. Unknown weather
   (past the forecast horizon) is handled before classification, in the weather layer.
 - `backend/tests/risk/test_purity.py` fails the build if `risk/` imports anything outside a small
