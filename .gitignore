@@ -22,8 +22,8 @@ dist/
 coverage/
 
 # Playwright
-e2e/test-results/
-e2e/playwright-report/
+frontend/e2e/test-results/
+frontend/e2e/playwright-report/
 
 # Local agent state (skills and settings.json are tracked)
 .claude/worktrees/
