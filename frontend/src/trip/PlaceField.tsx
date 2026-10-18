@@ -45,7 +45,8 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
     retry: false,
   });
 
-  // Suggestions for text the user has since changed cannot be picked, so Enter never takes one.
+  // Suggestions for text the user has since changed are hidden, so Enter never takes one. Hiding
+  // them (rather than disabling) also lets the first fresh suggestion take the highlight.
   const stale = query !== text.trim() || suggestions.isPlaceholderData;
 
   const noOptionsText =
@@ -53,7 +54,7 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
       ? "Type at least two letters"
       : suggestions.isError
         ? suggestions.error.message
-        : suggestions.isFetching
+        : suggestions.isFetching || stale
           ? "Searching…"
           : "No matching places";
 
@@ -62,10 +63,9 @@ export function PlaceField({ id, label, value, onChange, error, inputRef }: Plac
       id={id}
       value={value}
       inputValue={text}
-      options={searching ? (suggestions.data ?? []) : value ? [value] : []}
+      options={searching ? (stale ? [] : (suggestions.data ?? [])) : value ? [value] : []}
       // The API already ranks matches; filtering again would hide good ones.
       filterOptions={(options) => options}
-      getOptionDisabled={() => searching && stale}
       getOptionLabel={(place) => place.label}
       getOptionKey={(place) => `${place.label}@${place.lat},${place.lon}`}
       isOptionEqualToValue={(a, b) => a.lat === b.lat && a.lon === b.lon && a.label === b.label}
