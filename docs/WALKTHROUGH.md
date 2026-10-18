@@ -14,7 +14,7 @@ Every step runs on the live site, https://spotter.akhilsingh.in.
 
 Plan Denver to Salt Lake City, 45,000 lb, checking every 25 miles.
 
-- **Three routes.** Point out a Detour chip: when the router offers fewer than three distinct
+- **Three routes.** Point out a Fallback chip: when the router offers fewer than three distinct
   routes, the rest come from a via point off the direct line (`routing.md` D4). The load also goes
   to the router, so a heavier truck can be sent another way (`routing.md` D2).
 - **Checkpoints at the ETA.** Expand the checkpoint list: mile, ETA in the browser's zone, the
@@ -42,8 +42,8 @@ Plan Denver to Salt Lake City, 45,000 lb, checking every 25 miles.
   truck where its ETAs put it. Drag the slider back and forth.
 - Open the network panel and scrub: no requests. Switch to Wind, Rain and Snow: continuous ramps
   with their units, never level colours (`corridor-heatmap.md` D6, D7).
-- Performance: one request for all 49 frames (about 30 KB gzipped); a slider step costs under
-  10 ms at p95 (measurements in `corridor-heatmap.md` D7).
+- Performance: one request for all 49 frames (about 30 KB gzipped); a slider step costs about
+  11 ms at p95 (measurements in `corridor-heatmap.md` D7).
 - Keyboard: Tab from the form to the cards, arrows on the slider, Page Up and Page Down for three
   hours.
 

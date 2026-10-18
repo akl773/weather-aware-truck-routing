@@ -13,7 +13,7 @@ corridor plays the next 48 hours of weather.
 
 - **Three routes** from Stadia Maps' truck routing, which is also given the truck's weight. When
   the router offers fewer than three distinct routes, the rest come from a via point off the
-  direct line and are marked Detour.
+  direct line and are marked Fallback.
 - **Checkpoints at the ETA.** Each route gets a checkpoint at the start, every interval and at the
   destination. Each checkpoint's ETA comes from the router's own timing, and its wind, rain and
   snow are interpolated from Open-Meteo's hourly forecast to that minute.
@@ -52,7 +52,7 @@ in the brief they settle, are in [risk classification](docs/decisions/risk-class
 - A long plan takes about 2 s cold and about 1 s from the cache. The weather for a whole route is a
   few batched requests on a shared 0.05° lattice, so nearby trips share cached forecasts.
 - The heatmap is one response of about 30 KB gzipped for all 49 frames.
-- A slider step costs under 10 ms at p95 on an M2 Pro laptop at 2×, including the map redraw, and
+- A slider step costs about 11 ms at p95 on an M2 Pro laptop at 2×, including the map redraw, and
   makes no request. The method and numbers are in
   [corridor heatmap D7](docs/decisions/corridor-heatmap.md).
 
