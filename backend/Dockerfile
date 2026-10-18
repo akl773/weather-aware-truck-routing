@@ -23,5 +23,6 @@ ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 GIT_SHA=$GIT_SHA
 USER app
 EXPOSE 8000
 # A plan waits on routing and weather providers; the timeout sits just under nginx's 65 s.
+# No control socket: nothing here uses gunicornc, and the app user cannot write one in its home.
 CMD ["gunicorn", "config.wsgi", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", \
-     "--access-logfile", "-"]
+     "--access-logfile", "-", "--no-control-socket"]
