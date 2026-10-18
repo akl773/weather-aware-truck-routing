@@ -5,7 +5,7 @@ import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { type PlanRequest, fetchHealth } from "./api/client";
 import type { components } from "./api/schema";
@@ -64,13 +64,22 @@ export function App() {
   };
 
   const showResults = Boolean(data) && !editing;
+  // The form collapses under the focused button, so focus moves to what replaced it.
+  const results = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showResults) results.current?.focus({ preventScroll: true });
+  }, [showResults, data]);
+  const edit = () => {
+    setEditing(true);
+    requestAnimationFrame(() => document.getElementById("origin")?.focus());
+  };
 
   return (
     <Box sx={{ position: "fixed", inset: 0 }}>
       <Panel>
         <Header />
         <Collapse in={showResults} unmountOnExit>
-          {request ? <TripSummary request={request} onEdit={() => setEditing(true)} /> : null}
+          {request ? <TripSummary request={request} onEdit={edit} /> : null}
         </Collapse>
         <Collapse in={!showResults}>
           <TripForm
@@ -86,7 +95,14 @@ export function App() {
           />
         </Collapse>
         {showResults && data && selectedRoute ? (
-          <Stack spacing={2} sx={{ mt: 2 }}>
+          <Stack
+            spacing={2}
+            sx={{ mt: 2, outline: "none" }}
+            ref={results}
+            tabIndex={-1}
+            component="section"
+            aria-label="Plan"
+          >
             <Divider />
             <Recommendation plan={data} />
             <RouteCards plan={data} selectedId={selectedId} onSelect={select} />
