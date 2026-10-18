@@ -63,3 +63,48 @@ Enforced by: `backend/config/settings.py`, `backend/.env.example`.
 Coverage is reported but has no target percentage. A number target rewards testing trivial code.
 Rejected: backend-only tests, because half the grade is the UI.
 Enforced by: `backend/pyproject.toml` (`[tool.pytest.ini_options]`), CI (#4).
+
+## Frontend
+
+### D7. Vite + React + strict TypeScript, built to static files
+The app is one interactive map page, so it gains nothing from server rendering. Vite builds static
+assets that nginx serves next to the API, on one origin (`deployment.md`).
+TypeScript is pinned to 5.9.
+Rejected: Next.js, because SSR and routing add a server process with nothing to render.
+Rejected: TypeScript 7, because typescript-eslint (`<6.1`) and openapi-typescript (`^5`) do not
+support it yet.
+Enforced by: `frontend/package.json`, `frontend/tsconfig.json` (`strict`).
+
+### D8. MUI for controls
+The form, route cards, slider and toggles are standard controls with accessibility handled. The role
+asks for React with Material UI.
+Rejected: hand-built controls, because accessible sliders and autocompletes are slow to get right.
+Enforced by: `frontend/src/theme.ts`.
+
+### D9. MapLibre GL + deck.gl in interleaved mode
+deck.gl draws routes, checkpoints and corridor cells on the GPU. Moving the slider only changes one
+layer's colour attribute, which keeps scrubbing smooth (`corridor-heatmap.md`). `MapLibreOverlay`
+with `interleaved` renders deck.gl layers inside MapLibre's own render pass, so the corridor can sit
+beneath road names and place labels.
+Rejected: Mapbox GL JS, because it needs an access token and is proprietary from v2.
+Rejected: Leaflet, because DOM and canvas redraws stutter at grid sizes we need.
+Enforced by: `frontend/src/map/DeckOverlay.tsx`.
+
+### D10. OpenFreeMap Positron basemap
+Free, no API key, no usage cap, MapLibre vector style. Positron is near-greyscale, so the five risk
+colours stay the most saturated thing on the map.
+Rejected: MapTiler, because its key would ship in client code and the free tier is capped.
+Rejected: OpenFreeMap Liberty, because its colourful roads and parks compete with the risk colours.
+Enforced by: `frontend/src/map/basemap.ts`.
+
+### D11. TanStack Query for server state, React state for the rest
+Plan and corridor responses are server state: cached per trip, deduplicated, with loading and error
+states. Slider hour, selected route and the variable toggle are UI state held in React.
+Rejected: Redux Toolkit or Zustand, because no state is shared widely enough to need a store yet.
+Enforced by: `frontend/src/main.tsx` (`QueryClientProvider`).
+
+### D12. API types generated from the OpenAPI schema
+`npm run api:types` runs openapi-typescript against `/api/schema/`, and openapi-fetch calls the API
+with those types. A renamed field on the backend becomes a type error on the frontend.
+Rejected: hand-written TypeScript types, because they drift from the serializers.
+Enforced by: `frontend/src/api/client.ts`, `frontend/src/api/schema.d.ts`.
