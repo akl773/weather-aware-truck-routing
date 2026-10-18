@@ -57,8 +57,13 @@ export function parseLocalInput(value: string): Date | null {
     number,
   ];
   const date = new Date(year, month - 1, day, hour, minute);
-  // Rejects 31 February and the like, which Date would roll into the next month.
-  return date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+  // Rejects 31 February, and the hour clocks skip in spring, both of which Date rolls forward.
+  const exists =
+    date.getMonth() === month - 1 &&
+    date.getDate() === day &&
+    date.getHours() === hour &&
+    date.getMinutes() === minute;
+  return exists ? date : null;
 }
 
 export function nextFullHour(now: Date): Date {
@@ -85,7 +90,7 @@ export function haversineMi(a: Place, b: Place): number {
   const dLon = (b.lon - a.lon) * rad;
   const h =
     Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
-  return 2 * 3958.8 * Math.asin(Math.sqrt(h));
+  return 2 * 3958.8 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 export function parseLoad(text: string): number | null {
@@ -109,8 +114,10 @@ export function validateTrip(draft: TripDraft, now: Date): Validation {
   }
 
   const departure = parseLocalInput(draft.departure);
-  if (!departure) {
+  if (draft.departure === "") {
     errors.departure = "Enter a date and time.";
+  } else if (!departure) {
+    errors.departure = "That time doesn't exist here; clocks skip it.";
   } else if (departure.getTime() < now.getTime() - DEPARTURE_PAST_MS) {
     errors.departure = "Departure can be at most an hour ago.";
   } else if (departure.getTime() > now.getTime() + DEPARTURE_AHEAD_MS) {

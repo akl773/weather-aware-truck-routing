@@ -60,6 +60,12 @@ describe("departure (ui D3)", () => {
     expect(parseLocalInput("2026-02-28T12:00")).not.toBeNull();
   });
 
+  it("rejects the hour clocks skip when daylight saving starts", () => {
+    expect(parseLocalInput("2026-03-08T02:30")).toBeNull();
+    expect(parseLocalInput("2026-03-08T01:59")).not.toBeNull();
+    expect(parseLocalInput("2026-03-08T03:00")).not.toBeNull();
+  });
+
   it.each([
     ["2026-10-19T11:00", true], // exactly an hour ago
     ["2026-10-19T10:59", false],
