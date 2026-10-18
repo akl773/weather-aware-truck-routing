@@ -36,3 +36,29 @@ def fetch_cached[T](key: str, ttl_s: int, fetch: Callable[[], T]) -> T:
     except Exception:
         log.warning("cache write failed for %s", key, exc_info=True)
     return value
+
+
+def fetch_many_cached[T](
+    keys: dict[str, Any], ttl_s: int, fetch: Callable[[list[Any]], dict[Any, T]]
+) -> dict[Any, T]:
+    """Like `fetch_cached` for many items at once: `keys` maps cache key to item.
+
+    Items missing from the cache are passed to `fetch` in one call, which returns a value per item.
+    Cache failures are logged and treated as misses (stack D3).
+    """
+    try:
+        hits = cache.get_many(list(keys))
+    except Exception:
+        log.warning("cache read failed for %d keys; calling the provider", len(keys), exc_info=True)
+        hits = {}
+    found = {keys[key]: value for key, value in hits.items() if key in keys}
+    missing = [item for key, item in keys.items() if key not in hits]
+    if missing:
+        fetched = fetch(missing)
+        found.update(fetched)
+        by_item = {item: key for key, item in keys.items()}
+        try:
+            cache.set_many({by_item[item]: value for item, value in fetched.items()}, ttl_s)
+        except Exception:
+            log.warning("cache write failed for %d keys", len(fetched), exc_info=True)
+    return found
