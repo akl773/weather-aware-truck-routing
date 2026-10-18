@@ -21,7 +21,7 @@ Rejected: Google Routes and Mapbox Directions, because neither has a truck profi
 Rejected: openrouteservice's HGV profile, because its alternative routes are limited to short trips
 (100 km at the time of writing).
 Rejected: the public OSRM demo server, because it has no truck profile and no usage terms for an app.
-Enforced by: `providers.stadia.StadiaRouting`.
+Enforced by: `providers.stadia.StadiaMaps`.
 
 ### D2. The truck weight sent to the provider is a 35,000 lb tractor-trailer plus the load
 Valhalla's `weight` is the whole vehicle in metric tons and gates weight-restricted bridges and
