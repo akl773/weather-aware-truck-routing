@@ -42,7 +42,12 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Error: {
+            /** @description What went wrong, ready to show to the user. */
             detail: string;
+            /** @description Per-field messages, present when the input was invalid. */
+            fields?: {
+                [key: string]: unknown;
+            };
         };
         Health: {
             status: string;
@@ -86,9 +91,9 @@ export interface operations {
     };
     places: {
         parameters: {
-            query?: {
+            query: {
                 /** @description What the user has typed, 2+ chars. */
-                q?: string;
+                q: string;
             };
             header?: never;
             path?: never;

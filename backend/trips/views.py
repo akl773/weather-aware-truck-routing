@@ -18,7 +18,10 @@ class PlaceSerializer(serializers.Serializer):
 
 
 class ErrorSerializer(serializers.Serializer):
-    detail = serializers.CharField()
+    detail = serializers.CharField(help_text="What went wrong, ready to show to the user.")
+    fields = serializers.DictField(
+        required=False, help_text="Per-field messages, present when the input was invalid."
+    )
 
 
 class PlacesView(APIView):
@@ -26,7 +29,11 @@ class PlacesView(APIView):
 
     @extend_schema(
         operation_id="places",
-        parameters=[OpenApiParameter("q", str, description="What the user has typed, 2+ chars.")],
+        parameters=[
+            OpenApiParameter(
+                "q", str, required=True, description="What the user has typed, 2+ chars."
+            )
+        ],
         responses={200: PlaceSerializer(many=True), 400: ErrorSerializer, 502: ErrorSerializer},
     )
     def get(self, request: Request) -> Response:

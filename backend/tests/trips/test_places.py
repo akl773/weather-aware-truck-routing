@@ -55,3 +55,9 @@ def test_the_key_never_reaches_the_response(monkeypatch):
     response = Client().get("/api/places", {"q": "Denv"})
     assert "secret-key" in seen[0]
     assert b"secret-key" not in response.content
+
+
+def test_invalid_input_has_the_same_error_shape_as_other_failures():
+    body = Client().get("/api/places", {"q": "D"}).json()
+    assert body["detail"] == "q: Ensure this field has at least 2 characters."
+    assert body["fields"] == {"q": ["Ensure this field has at least 2 characters."]}
