@@ -23,7 +23,7 @@ export function cellPolygons(corridor: CorridorResponse): LngLat[][] {
 
 interface HeatmapLayerProps {
   polygons: LngLat[][];
-  /** RGBA bytes per cell at the slider's hour, rewritten in place as it moves. */
+  /** RGBA bytes per cell at the slider's hour, a new array each time the hour changes. */
   colors: Uint8ClampedArray;
   hour: number;
   view: HeatmapView;

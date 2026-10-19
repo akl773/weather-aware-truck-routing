@@ -125,9 +125,9 @@ Enforced by: `frontend/src/corridor/colors.ts`; `colors.test.ts`.
 ### D7. Scrubbing is local: colours are precomputed per frame and blended between hours
 When the corridor arrives, each view's colours are computed once for every frame, as one flat byte
 array per frame. Moving the slider only blends the two frames either side of the slider's hour into
-a reused array and hands it to the cell layer as a new colour attribute; nothing is fetched, parsed
-or tessellated again. The slider moves in quarter hours (Page Up and Page Down jump three hours) and
-Play runs the 48 hours in 16 seconds, so the wind, rain and snow views visibly drift between the
+a new array of about 1 KB, so render mutates nothing, and hands it to the cell layer as a new
+colour attribute; nothing is fetched, parsed or tessellated again. The slider moves in quarter
+hours (Page Up and Page Down jump three hours) and Play runs the 48 hours in 16 seconds, so the wind, rain and snow views visibly drift between the
 hourly frames instead of jumping. The risk view shows the nearest hourly frame: halfway between a
 Low and a Severe cell's colours is another level's colour, which no forecast gave. Play advances
 by each frame's elapsed time, capped at 100 ms, so a background tab resumes where it left off, and

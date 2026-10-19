@@ -73,9 +73,14 @@ export function MapStage({
     () => (corridor.data ? frameColors(corridor.data, view) : null),
     [corridor.data, view],
   );
+  const drawHour = frameHour(view, hour);
+  // A fresh buffer per hour keeps render pure; at 4 bytes a cell it is about 1 KB.
   const colors = useMemo(
-    () => (corridor.data ? new Uint8ClampedArray(corridor.data.cells.length * 4) : null),
-    [corridor.data],
+    () =>
+      frames && corridor.data
+        ? blendFrames(frames, drawHour, new Uint8ClampedArray(corridor.data.cells.length * 4))
+        : null,
+    [frames, drawHour, corridor.data],
   );
 
   // The same layer instances while scrubbing, so deck.gl skips them without diffing their props.
@@ -88,9 +93,8 @@ export function MapStage({
   );
 
   const layers = [];
-  if (polygons && frames && colors) {
-    blendFrames(frames, frameHour(view, hour), colors);
-    layers.push(heatmapLayer({ polygons, colors, hour: frameHour(view, hour), view }));
+  if (polygons && colors) {
+    layers.push(heatmapLayer({ polygons, colors, hour: drawHour, view }));
   }
   layers.push(...routeLayers);
   if (plan && request) {
