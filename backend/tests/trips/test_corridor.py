@@ -232,3 +232,54 @@ def test_a_cell_matches_a_plan_checkpoint_at_its_centre(monkeypatch, hour):
     assert checkpoint.eta == departure
     assert frame.readings[i] == checkpoint.readings
     assert frame.levels[i] == checkpoint.level
+
+
+class ThresholdRain:
+    def hourly(self, points, start, hours):
+        times = tuple(start.timestamp() + 3600 * k for k in range(hours))
+        calm = (0.0,) * hours
+        rain = (1.004,) * hours
+        return {p: Series(times, calm, calm, rain, calm) for p in points}
+
+
+def test_no_travel_rain_stays_no_travel_when_corridor_response_rounds_to_one():
+    from trips.serializers import corridor_response
+
+    corridor = corridor_cells([CORRIDOR_PATH])
+    frames = corridor_frames(
+        corridor,
+        departure=PLAN_DEPARTURE,
+        load_lb=0,
+        weather=ThresholdRain(),
+        now=PLAN_NOW,
+    )
+    response = corridor_response(corridor, frames, PLAN_DEPARTURE)
+    assert all(r.rain_in_hr == 1.004 for f in frames for r in f.readings)
+    assert all(level == 4 for f in response["frames"] for level in f["level"])
+    assert all(rain == 1.0 for f in response["frames"] for rain in f["rain_in_hr"])
+
+
+def test_no_travel_rain_drives_route_summary_before_response_rounding():
+    from tests.trips.test_plan import recorded_router
+    from trips.serializers import plan_response
+
+    plan = trips.plan.plan_trip(
+        origin=DENVER,
+        destination=SALT_LAKE_CITY,
+        departure=PLAN_DEPARTURE,
+        load_lb=LOAD_LB,
+        interval_mi=25,
+        router=recorded_router(),
+        weather=ThresholdRain(),
+        now=PLAN_NOW,
+    )
+    response = plan_response(plan)
+    for route in plan.routes:
+        assert route.summary.miles_at(Level.NO_TRAVEL) == pytest.approx(
+            route.summary.distance_miles
+        )
+    for route in response["routes"]:
+        assert all(
+            c["level"] == 4 and c["readings"]["rain_in_hr"] == 1.0 for c in route["checkpoints"]
+        )
+    assert response["recommendation"]["all_routes_cross_no_travel"] is True

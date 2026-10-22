@@ -53,19 +53,45 @@ def test_hourly_totals_are_read_at_their_mid_hour():
     assert readings.rain_in_hr == 0.2
 
 
-def test_readings_are_rounded_as_shown():
-    readings = readings_at(series(wind_mph=(44.94, 44.96), rain_in_hr=(0.2449, 0.2451)), at(1800))
-    assert readings.wind_mph == 45.0
-    assert readings.rain_in_hr == 0.25
+@pytest.mark.parametrize(
+    ("field", "value", "load", "expected"),
+    [
+        ("rain_in_hr", 0.096, 0, Level.LOW),
+        ("rain_in_hr", 0.10, 0, Level.MODERATE),
+        ("rain_in_hr", 0.246, 0, Level.MODERATE),
+        ("rain_in_hr", 0.25, 0, Level.HIGH),
+        ("rain_in_hr", 0.496, 0, Level.HIGH),
+        ("rain_in_hr", 0.50, 0, Level.SEVERE),
+        ("rain_in_hr", 1.0, 0, Level.SEVERE),
+        ("rain_in_hr", 1.004, 0, Level.NO_TRAVEL),
+        ("snow_in_hr", 0.496, 0, Level.LOW),
+        ("snow_in_hr", 0.5, 0, Level.MODERATE),
+        ("snow_in_hr", 0.996, 0, Level.MODERATE),
+        ("snow_in_hr", 1.0, 0, Level.HIGH),
+        ("snow_in_hr", 1.996, 0, Level.HIGH),
+        ("snow_in_hr", 2.0, 0, Level.SEVERE),
+        ("snow_in_hr", 3.0, 0, Level.SEVERE),
+        ("snow_in_hr", 3.004, 0, Level.NO_TRAVEL),
+        ("wind_mph", 24.96, 0, Level.LOW),
+        ("wind_mph", 25.0, 0, Level.MODERATE),
+        ("wind_mph", 34.96, 40001, Level.MODERATE),
+        ("wind_mph", 35.0, 40001, Level.SEVERE),
+        ("wind_mph", 44.96, 30001, Level.HIGH),
+        ("wind_mph", 45.0, 30001, Level.NO_TRAVEL),
+        ("wind_mph", 54.96, 0, Level.SEVERE),
+        ("wind_mph", 55.0, 0, Level.NO_TRAVEL),
+    ],
+)
+def test_classification_uses_forecast_precision_before_display_rounding(
+    field, value, load, expected
+):
+    readings = readings_at(series(**{field: (value, value)}), at(1800))
+    assert classify_checkpoint(readings, load)[0] is expected
 
 
-def test_level_matches_the_reading_shown():
-    # Raw 1.004 in/hr would be No Travel (> 1.00); shown as 1.00 it is Severe, and so is the level.
-    readings = readings_at(series(rain_in_hr=(1.004, 1.004)), at(1800))
-    level, drivers, _ = classify_checkpoint(readings, LOAD_LB)
-    assert readings.rain_in_hr == 1.0
-    assert level is Level.SEVERE
-    assert drivers == (Condition.RAIN,)
+def test_gust_flag_uses_unrounded_wind_on_each_side_of_the_band_edge():
+    readings = readings_at(series(wind_mph=(24.96, 24.96), gust_mph=(25.0, 25.0)), at(1800))
+    assert classify_checkpoint(readings, 0) == (Level.LOW, (), True)
 
 
 def test_readings_outside_the_forecast_are_unknown():

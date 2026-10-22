@@ -87,6 +87,9 @@ export function CheckpointDetails({ routeId, checkpoint }: { routeId: string; ch
           </Box>
         ))}
       </Box>
+      <Typography variant="caption" color="text.secondary">
+        Readings are rounded. Risk uses the unrounded forecast.
+      </Typography>
       {levelReason(checkpoint) || checkpoint.gusty ? (
         <Typography variant="caption" color="text.secondary">
           {levelReason(checkpoint)}
