@@ -85,10 +85,9 @@ next to an edge instead of on it: 88.51392 km/h converts to 54.99999999999999 mp
 between 0.01 and 0.19 in/hr is 0.09999999999999999. Compared raw, both fall one band too low, and
 the 55 mph wind would escape the any-load No Travel rule. Rounding to 6 decimals removes that noise
 and changes no real reading, since every provider value is far coarser.
-Rejected: rounding to a display precision here, because precision is the caller's choice. The plan
-rounds each reading to what the UI shows before classifying it (plan-api D2), so 0.096 in/hr is
-shown as 0.10 and is Moderate on purpose. This module only removes float noise, so a caller that
-passes unrounded readings gets them classified as given.
+Rejected: rounding to display precision before classification, because that changes thresholds.
+The plan and corridor pass interpolated readings unchanged (plan-api D2, updated in #33); only
+response serialization rounds for display. This module removes float noise, not forecast precision.
 Rejected: `math.isclose` at each comparison, because a tolerance spread across every edge check is
 harder to reason about than one rounding step.
 Enforced by: `risk.classification.BandEdges.band`, `wind_band_for_load`;

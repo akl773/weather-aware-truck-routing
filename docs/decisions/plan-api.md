@@ -6,7 +6,7 @@ Status: decided by Akhil, 2026-10-18. Issue: #10.
 One request turns a trip into everything the map and the route cards show: three routes, their
 checkpoints with ETA, readings, level and driver condition, each route's summary and the
 recommendation with its reason. Every number in the response is the number the UI prints, so the
-screen, the ranking and the classification can never disagree.
+screen and ranking agree; weather classification uses forecast precision before display rounding.
 
 ## Decisions
 
@@ -19,15 +19,18 @@ Rejected: accepting a naive departure and assuming a zone, because the server ca
 driver's clock.
 Enforced by: `trips.serializers.PlanRequestSerializer`; `test_plan_rejects_*`.
 
-### D2. Readings are rounded to the precision shown before they are classified
-Wind and gusts to 0.1 mph, rain and snow to 0.01 in/hr, half up (recommendation D4). The rounded
-reading is both what the UI prints and what the risk table classifies, so a checkpoint never shows
-"rain 1.00 in/hr" with a No Travel level because the raw value was 1.004.
-Rejected: classifying raw values and rounding only for display, because a reading on an edge then
-appears to contradict its level.
-Rejected: showing more decimals, because any fixed precision has the same contradiction on some
-edge; only classifying what is shown removes it.
-Enforced by: `trips.plan.readings_at`; `test_level_matches_the_reading_shown`.
+### D2. Classify forecast readings before rounding them for display
+Updated for #33: interpolated readings retain their precision through checkpoint and corridor
+classification, including load rules, gust flags, drivers and route summaries. The risk engine's
+six-decimal float-noise normalization still applies (risk-classification D7).
+Only response serialization rounds wind and gusts to 0.1 mph and rain and snow to 0.01 in/hr,
+half up (recommendation D4). The UI explains that readings are rounded and risk uses the unrounded
+forecast. Thus rain at 1.004 in/hr is No Travel even though its displayed reading is 1.00.
+This replaces the earlier decision to classify display-rounded readings: that changed the spec's
+thresholds, hiding No Travel precipitation and prematurely escalating wind/load bands.
+Rejected: adding a fixed number of display decimals, because any fixed precision can hide an edge.
+Enforced by: `trips.plan.readings_at`, `trips.serializers`;
+`test_classification_uses_forecast_precision_before_display_rounding`.
 
 ### D3. A checkpoint without a full forecast has an unknown level, unless it is already No Travel
 If wind, rain or snow is unknown at the ETA (checkpoints-and-eta D5), the checkpoint's level is
