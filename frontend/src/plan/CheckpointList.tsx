@@ -56,6 +56,9 @@ export const CheckpointList = memo(function CheckpointList({ route, onHighlight 
         {open ? "Hide" : "Show"} {route.checkpoints.length} checkpoints on Route {route.id}
       </Button>
       <Collapse in={open} unmountOnExit>
+        <Typography variant="caption" color="text.secondary">
+          Readings are rounded. Risk uses the unrounded forecast.
+        </Typography>
         <Box
           id="checkpoint-list"
           component="ol"

@@ -49,7 +49,7 @@ Enforced by: `trips.corridor.corridor_cells`; `test_cells_cover_every_route_poin
 
 ### D2. 49 hourly frames, hour 0 at departure, classified on the server for the trip's load
 Frame k holds every cell's readings at departure + k hours, for k from 0 to 48, so the slider's two
-ends are both real frames. Readings are interpolated at that instant and rounded as shown, then
+ends are both real frames. Readings are interpolated at that instant without display rounding, then
 classified, exactly as a checkpoint's are (checkpoints-and-eta D4, plan-api D2 and D3), so a cell's
 level is the level a checkpoint there would get at that hour.
 Rejected: sending raw values and classifying in the browser, because the graded rules would then

@@ -26,7 +26,7 @@ HEATMAP_HOURS = 48
 
 @dataclass(frozen=True)
 class Readings:
-    """Conditions at a checkpoint's ETA, rounded as shown (D2). `None` is unknown."""
+    """Conditions at a checkpoint's ETA, at forecast precision (D2). `None` is unknown."""
 
     wind_mph: float | None
     gust_mph: float | None
@@ -64,18 +64,14 @@ class Plan:
     weather_hours: int
 
 
-def _shown(value: float | None, places: int) -> float | None:
-    return None if value is None else display_round(value, places)
-
-
 def readings_at(series: Series, eta: datetime) -> Readings:
-    """Conditions at `eta`, interpolated (checkpoints-and-eta D4) and rounded as shown (D2)."""
+    """Conditions at `eta`, interpolated (checkpoints-and-eta D4) and at forecast precision (D2)."""
     t = eta.timestamp()
     return Readings(
-        wind_mph=_shown(value_at(series.times, series.wind_mph, t), 1),
-        gust_mph=_shown(value_at(series.period_times, series.gust_mph, t), 1),
-        rain_in_hr=_shown(value_at(series.period_times, series.rain_in_hr, t), 2),
-        snow_in_hr=_shown(value_at(series.period_times, series.snow_in_hr, t), 2),
+        wind_mph=value_at(series.times, series.wind_mph, t),
+        gust_mph=value_at(series.period_times, series.gust_mph, t),
+        rain_in_hr=value_at(series.period_times, series.rain_in_hr, t),
+        snow_in_hr=value_at(series.period_times, series.snow_in_hr, t),
     )
 
 

@@ -217,6 +217,11 @@ class PlanResponseSerializer(serializers.Serializer):
     weather = WeatherWindowSerializer()
 
 
+def _shown_reading(value: float | None, name: str) -> float | None:
+    # plan-api D2: presentation must never change the readings used for classification.
+    return None if value is None else display_round(value, 1 if name.endswith("_mph") else 2)
+
+
 def _checkpoint(c: PlannedCheckpoint) -> dict[str, Any]:
     return {
         "mile": display_round(c.mile, 1),
@@ -226,10 +231,10 @@ def _checkpoint(c: PlannedCheckpoint) -> dict[str, Any]:
         "owned_from_mi": display_round(c.owned_from_mi, 1),
         "owned_to_mi": display_round(c.owned_to_mi, 1),
         "readings": {
-            "wind_mph": c.readings.wind_mph,
-            "gust_mph": c.readings.gust_mph,
-            "rain_in_hr": c.readings.rain_in_hr,
-            "snow_in_hr": c.readings.snow_in_hr,
+            "wind_mph": _shown_reading(c.readings.wind_mph, "wind_mph"),
+            "gust_mph": _shown_reading(c.readings.gust_mph, "gust_mph"),
+            "rain_in_hr": _shown_reading(c.readings.rain_in_hr, "rain_in_hr"),
+            "snow_in_hr": _shown_reading(c.readings.snow_in_hr, "snow_in_hr"),
         },
         "level": None if c.level is None else int(c.level),
         "drivers": [str(d) for d in c.drivers],
@@ -300,7 +305,7 @@ class CorridorResponseSerializer(serializers.Serializer):
 
 
 def _readings_column(readings: tuple[Readings, ...], name: str) -> list[float | None]:
-    return [getattr(r, name) for r in readings]
+    return [_shown_reading(getattr(r, name), name) for r in readings]
 
 
 def corridor_response(
